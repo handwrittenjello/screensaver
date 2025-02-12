@@ -10,8 +10,8 @@ IMAGE_FOLDER = "static/images"
 # Default settings with Ken Burns enabled by default.
 settings = {
     "display_time": 5,        # Seconds per image (used by frontend as a default)
-    "transition_speed": 1,    # Transition speed in seconds
-    "ken_burns": True         # Ken Burns effect enabled by default
+    "transition_speed": 1,      # Transition speed in seconds
+    "ken_burns": True           # Ken Burns effect enabled by default
 }
 
 def get_images():

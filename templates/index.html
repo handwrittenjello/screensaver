@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Astrophotography Slideshow</title>
   <style>
+    /* Basic page styling */
     body {
       background-color: black;
       color: white;
@@ -19,11 +21,13 @@
       align-items: center;
       cursor: auto;
     }
+
     #slideshow-container {
       position: relative;
       width: 100vw;
       height: 100vh;
     }
+
     img {
       position: absolute;
       top: 0;
@@ -34,18 +38,29 @@
       opacity: 0;
       transition: opacity 2s ease-in-out;
     }
+
     .visible {
       opacity: 1;
     }
+
     .ken-burns {
       animation: zoomPan 15s infinite alternate;
     }
+
     @keyframes zoomPan {
-      from { transform: scale(1) translate(0, 0); }
-      to { transform: scale(1.2) translate(calc(-10% + (20% * var(--rand-x))), calc(-10% + (20% * var(--rand-y)))); }
+      from {
+        transform: scale(1) translate(0, 0);
+      }
+
+      to {
+        transform: scale(1.2) translate(calc(-10% + (20% * var(--rand-x))), calc(-10% + (20% * var(--rand-y))));
+      }
     }
+
     /* Buttons styling */
-    #fullscreen-btn, #settings-btn, #upload-btn {
+    #fullscreen-btn,
+    #settings-btn,
+    #upload-btn {
       position: absolute;
       padding: 10px 20px;
       background-color: rgba(255, 255, 255, 0.2);
@@ -56,25 +71,31 @@
       border-radius: 5px;
       z-index: 1000;
     }
+
     #fullscreen-btn {
       top: 10px;
       right: 10px;
     }
+
     #settings-btn {
       top: 10px;
       right: 130px;
     }
+
     #upload-btn {
       top: 10px;
       left: 10px;
     }
+
     /* Hide file input element */
     #file-input {
       display: none;
     }
+
     .hidden {
       display: none;
     }
+
     /* Progress bar styling */
     #progress-container {
       position: absolute;
@@ -86,13 +107,68 @@
       font-size: 18px;
       z-index: 2000;
     }
+
     #progress-bar {
       width: 300px;
       height: 20px;
       margin-top: 10px;
     }
+
+    /* Modal styling */
+    .modal {
+      display: none;
+      /* Hidden by default */
+      position: fixed;
+      z-index: 3000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 500px;
+      color: black;
+      text-align: left;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .modal label {
+      display: block;
+      margin: 10px 0;
+    }
+
+    .modal input[type="number"] {
+      width: 100%;
+      padding: 5px;
+    }
+
+    .modal #image-selection div {
+      margin-bottom: 5px;
+    }
   </style>
 </head>
+
 <body>
   <!-- Buttons -->
   <button id="fullscreen-btn">Full Screen</button>
@@ -101,7 +177,7 @@
   <!-- Hidden file input for image uploads -->
   <input type="file" id="file-input" accept="image/*" />
 
-  <!-- Progress bar container for initial loading -->
+  <!-- Progress bar container (visible during initial loading) -->
   <div id="progress-container">
     Loading images...
     <br />
@@ -110,19 +186,39 @@
 
   <div id="slideshow-container"></div>
 
-  <script>
-    let images = [];  // Array of image objects from backend, each with a filename
-    let currentIndex = 0;
-    let displayTime = 30000; // 30 seconds (in ms)
-    // Ken Burns effect enabled by default.
-    let kenBurns = true;
-    let slideTimeout;
-    const fadeDuration = 2000; // ms for fade in/out
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Settings</h2>
+      <label for="display-time">Display Time (seconds):</label>
+      <input type="number" id="display-time" value="30" min="1" />
+      <label>
+        <input type="checkbox" id="ken-burns-checkbox" checked />
+        Enable Ken Burns Effect
+      </label>
+      <h3>Select Images to Display:</h3>
+      <div id="image-selection">
+        <!-- Dynamically populated list of images with checkboxes -->
+      </div>
+      <button id="save-settings">Save</button>
+    </div>
+  </div>
 
-    // Preload buffer to always hold at least 4 images ahead.
+  <script>
+    // Global variables
+    let images = [];             // Full list from backend
+    let selectedImages = [];     // Initially, all images are selected
+    let currentIndex = 0;
+    let displayTime = 30000;     // 30 seconds in ms
+    let kenBurns = true;         // Ken Burns effect enabled by default
+    let slideTimeout;
+    const fadeDuration = 2000;   // Fade in/out duration in ms
+
+    // Preload buffer: an array to hold at least 4 images ahead.
     let preloadBuffer = [];
 
-    // Pointer idle timer (for full screen)
+    // Pointer idle timer (for hiding the mouse cursor in full screen)
     let pointerTimeout;
     function resetMouseIdleTimer() {
       if (document.fullscreenElement) {
@@ -149,22 +245,66 @@
       }
     });
 
-    // Fetch images from backend.
+    // Full screen helper functions with vendor prefix fallbacks.
+    function launchIntoFullscreen(element) {
+      if (element.requestFullscreen) {
+        return element.requestFullscreen();
+      } else if (element.mozRequestFullScreen) { // Firefox
+        return element.mozRequestFullScreen();
+      } else if (element.webkitRequestFullscreen) { // Chrome, Safari, Opera
+        return element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) { // IE/Edge
+        return element.msRequestFullscreen();
+      }
+    }
+    function exitFullscreen() {
+      if (document.exitFullscreen) {
+        return document.exitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        return document.mozCancelFullScreen();
+      } else if (document.webkitExitFullscreen) {
+        return document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        return document.msExitFullscreen();
+      }
+    }
+    // Full screen toggle event listener.
+    document.getElementById('fullscreen-btn').addEventListener('click', () => {
+      const elem = document.documentElement;
+      const btns = document.querySelectorAll('#fullscreen-btn, #settings-btn, #upload-btn');
+      if (!document.fullscreenElement &&
+        !document.mozFullScreenElement &&
+        !document.webkitFullscreenElement &&
+        !document.msFullscreenElement) {
+        launchIntoFullscreen(elem);
+        btns.forEach(btn => btn.classList.add('hidden'));
+        resetMouseIdleTimer();
+      } else {
+        exitFullscreen();
+        btns.forEach(btn => btn.classList.remove('hidden'));
+        document.body.style.cursor = 'auto';
+        clearTimeout(pointerTimeout);
+      }
+    });
+
+    // Fetch images from the backend.
     async function fetchImages() {
       const response = await fetch('/images');
       images = await response.json();
-      if (images.length > 0) {
+      // Initially, all images are selected.
+      selectedImages = [...images];
+      if (selectedImages.length > 0) {
         loadInitialBuffer();
       } else {
         console.error('No images found.');
       }
     }
 
-    // Preload the first 4 images (any 4 files) with a progress bar.
+    // Preload the first 4 images and update the progress bar.
     function loadInitialBuffer() {
       const progressBar = document.getElementById('progress-bar');
       const progressContainer = document.getElementById('progress-container');
-      let initialBufferCount = Math.min(4, images.length);
+      let initialBufferCount = Math.min(4, selectedImages.length);
       let loadedCount = 0;
       for (let i = 0; i < initialBufferCount; i++) {
         let tempImg = new Image();
@@ -176,38 +316,38 @@
             startSlideshow();
           }
         };
-        tempImg.src = `/static/images/${images[i].filename}`;
+        tempImg.src = `/static/images/${selectedImages[i].filename}`;
       }
     }
 
-    // Update preload buffer so it always holds at least 4 images ahead.
+    // Ensure our preload buffer always holds at least 4 images ahead.
     function updatePreloadBuffer() {
-      while (preloadBuffer.length < 4 && images.length > 0) {
-        let nextIndex = (currentIndex + preloadBuffer.length + 1) % images.length;
+      while (preloadBuffer.length < 4 && selectedImages.length > 0) {
+        let nextIndex = (currentIndex + preloadBuffer.length + 1) % selectedImages.length;
         let preImg = new Image();
-        preImg.src = `/static/images/${images[nextIndex].filename}`;
+        preImg.src = `/static/images/${selectedImages[nextIndex].filename}`;
         preloadBuffer.push({ img: preImg, index: nextIndex });
       }
     }
 
-    // Start or restart the slideshow.
+    // Start (or restart) the slideshow.
     function startSlideshow() {
       clearTimeout(slideTimeout);
       const container = document.getElementById('slideshow-container');
-      container.innerHTML = '';
+      container.innerHTML = '';  // Clear any existing images.
       currentIndex = 0;
-      preloadBuffer = [];
+      preloadBuffer = [];  // Clear the preload buffer.
       updatePreloadBuffer();
       showSlide();
     }
 
-    // Fade in current image and, when fade-in completes, wait for the next preloaded image.
+    // Fade in the current image and, when fade-in is complete, wait for the next preloaded image to load.
     function fadeInAndSchedule(currentImg, preloadImg) {
       void currentImg.offsetWidth;
       setTimeout(() => {
         currentImg.classList.add('visible');
       }, 50);
-      
+
       currentImg.addEventListener('transitionend', function onTransitionEnd(e) {
         if (e.propertyName === 'opacity' && getComputedStyle(currentImg).opacity === "1") {
           currentImg.removeEventListener('transitionend', onTransitionEnd);
@@ -216,7 +356,7 @@
       });
     }
 
-    // Wait until the first image in the preload buffer is loaded before scheduling transition.
+    // Wait until the first image in the preload buffer is loaded; then schedule the transition.
     function waitForNextImageAndSchedule(currentImg, preloadImg) {
       if (preloadImg.complete) {
         scheduleTransition(currentImg);
@@ -227,7 +367,7 @@
       }
     }
 
-    // Schedule fade-out and transition after displayTime.
+    // Schedule the fade-out transition after displayTime, then move to the next image.
     function scheduleTransition(currentImg) {
       slideTimeout = setTimeout(() => {
         currentImg.classList.remove('visible');
@@ -236,26 +376,26 @@
           if (preloadBuffer.length > 0) {
             preloadBuffer.shift();
           }
-          currentIndex = (currentIndex + 1) % images.length;
+          currentIndex = (currentIndex + 1) % selectedImages.length;
           updatePreloadBuffer();
           showSlide();
         }, fadeDuration);
       }, displayTime);
     }
 
-    // Show current slide.
+    // Show the current slide.
     function showSlide() {
       const container = document.getElementById('slideshow-container');
       const img = document.createElement('img');
-      img.src = `/static/images/${images[currentIndex].filename}`;
+      img.src = `/static/images/${selectedImages[currentIndex].filename}`;
       container.appendChild(img);
-      
+
       updatePreloadBuffer();
-      
-      let nextIndex = (currentIndex + 1) % images.length;
+
+      let nextIndex = (currentIndex + 1) % selectedImages.length;
       let preloadImg = new Image();
-      preloadImg.src = `/static/images/${images[nextIndex].filename}`;
-      
+      preloadImg.src = `/static/images/${selectedImages[nextIndex].filename}`;
+
       if (img.complete) {
         fadeInAndSchedule(img, preloadImg);
       } else {
@@ -263,7 +403,7 @@
           fadeInAndSchedule(img, preloadImg);
         };
       }
-      
+
       if (kenBurns) {
         img.style.setProperty('--rand-x', Math.random());
         img.style.setProperty('--rand-y', Math.random());
@@ -271,45 +411,73 @@
         img.style.animationDelay = `${randomDelay}s`;
         img.classList.add('ken-burns');
       }
-      
+
       currentIndex = nextIndex;
     }
 
-    // Full screen toggle.
-    document.getElementById('fullscreen-btn').addEventListener('click', () => {
-      const elem = document.documentElement;
-      const btns = document.querySelectorAll('#fullscreen-btn, #settings-btn, #upload-btn');
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen().then(() => {
-          btns.forEach(btn => btn.classList.add('hidden'));
-          resetMouseIdleTimer();
-        }).catch(err => console.error(`Error: ${err.message}`));
-      } else {
-        document.exitFullscreen().then(() => {
-          btns.forEach(btn => btn.classList.remove('hidden'));
-          document.body.style.cursor = 'auto';
-          clearTimeout(pointerTimeout);
-        });
+    // Modal functionality
+    const modal = document.getElementById('settings-modal');
+    const closeModalBtn = document.querySelector('#settings-modal .close');
+
+    // Open modal when settings button is clicked.
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      modal.style.display = 'block';
+      // Set form values.
+      document.getElementById('display-time').value = displayTime / 1000;
+      document.getElementById('ken-burns-checkbox').checked = kenBurns;
+      populateImageSelection();
+    });
+
+    // Close modal when close button is clicked.
+    closeModalBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    // Close modal if user clicks outside the modal content.
+    window.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        modal.style.display = 'none';
       }
     });
 
-    // Settings: update display time and optionally toggle Ken Burns (the current default is true).
-    document.getElementById('settings-btn').addEventListener('click', () => {
-      let newTime = prompt("Enter seconds per image (excluding transitions):", displayTime / 1000);
-      if (newTime !== null) {
-        displayTime = parseInt(newTime) * 1000;
+    // Populate the image selection list in the modal.
+    function populateImageSelection() {
+      const container = document.getElementById('image-selection');
+      container.innerHTML = '';
+      images.forEach((imgObj, index) => {
+        const isSelected = selectedImages.some(sel => sel.filename === imgObj.filename);
+        const div = document.createElement('div');
+        div.innerHTML = `<label>
+          <input type="checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}>
+          ${imgObj.filename}
+        </label>`;
+        container.appendChild(div);
+      });
+    }
+
+    // Save modal settings.
+    document.getElementById('save-settings').addEventListener('click', () => {
+      const dt = document.getElementById('display-time').value;
+      displayTime = parseInt(dt) * 1000;
+      kenBurns = document.getElementById('ken-burns-checkbox').checked;
+      const checkboxes = document.querySelectorAll('#image-selection input[type="checkbox"]');
+      selectedImages = [];
+      checkboxes.forEach((checkbox, index) => {
+        if (checkbox.checked) {
+          selectedImages.push(images[index]);
+        }
+      });
+      if (selectedImages.length === 0) {
+        alert("At least one image must be selected. Reverting to all images.");
+        selectedImages = [...images];
       }
-      // Optionally update kenBurns (this prompt will let you change it, but default remains true)
-      kenBurns = confirm("Enable Ken Burns effect? (OK for Yes, Cancel for No)");
+      modal.style.display = 'none';
       startSlideshow();
     });
 
-    // Upload button: trigger file selection.
+    // Upload functionality.
     document.getElementById('upload-btn').addEventListener('click', () => {
       document.getElementById('file-input').click();
     });
-    
-    // When a file is selected, upload it.
     document.getElementById('file-input').addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (file) {
@@ -319,18 +487,18 @@
           method: 'POST',
           body: formData
         })
-        .then(response => {
-          if (response.ok) {
-            alert('File uploaded successfully.');
-            fetchImages(); // Refresh images list.
-          } else {
-            alert('Upload failed.');
-          }
-        })
-        .catch(error => {
-          console.error('Upload error:', error);
-          alert('Upload error.');
-        });
+          .then(response => {
+            if (response.ok) {
+              alert('File uploaded successfully.');
+              fetchImages(); // Refresh image list.
+            } else {
+              alert('Upload failed.');
+            }
+          })
+          .catch(error => {
+            console.error('Upload error:', error);
+            alert('Upload error.');
+          });
       }
     });
 
@@ -338,4 +506,5 @@
     fetchImages();
   </script>
 </body>
+
 </html>
