@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Astrophotography Slideshow</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      text-align: center;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: auto;
+    }
+    #slideshow-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 2s ease-in-out;
+    }
+    .visible {
+      opacity: 1;
+    }
+    .ken-burns {
+      animation: zoomPan 15s infinite alternate;
+    }
+    @keyframes zoomPan {
+      from { transform: scale(1) translate(0, 0); }
+      to { transform: scale(1.2) translate(calc(-10% + (20% * var(--rand-x))), calc(-10% + (20% * var(--rand-y)))); }
+    }
+    /* Buttons styling */
+    #fullscreen-btn, #settings-btn, #upload-btn {
+      position: absolute;
+      padding: 10px 20px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 5px;
+      z-index: 1000;
+    }
+    #fullscreen-btn {
+      top: 10px;
+      right: 10px;
+    }
+    #settings-btn {
+      top: 10px;
+      right: 130px;
+    }
+    #upload-btn {
+      top: 10px;
+      left: 10px;
+    }
+    /* Hide file input element */
+    #file-input {
+      display: none;
+    }
+    .hidden {
+      display: none;
+    }
+    /* Progress bar styling */
+    #progress-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: white;
+      font-size: 18px;
+      z-index: 2000;
+    }
+    #progress-bar {
+      width: 300px;
+      height: 20px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Buttons -->
+  <button id="fullscreen-btn">Full Screen</button>
+  <button id="settings-btn">Settings</button>
+  <button id="upload-btn">Upload Image</button>
+  <!-- Hidden file input for image uploads -->
+  <input type="file" id="file-input" accept="image/*" />
+
+  <!-- Progress bar container for initial loading -->
+  <div id="progress-container">
+    Loading images...
+    <br />
+    <progress id="progress-bar" value="0" max="4"></progress>
+  </div>
+
+  <div id="slideshow-container"></div>
+
+  <script>
+    let images = [];  // Array of image objects from backend, each with a filename
+    let currentIndex = 0;
+    let displayTime = 30000; // 30 seconds (in ms)
+    // Ken Burns effect enabled by default.
+    let kenBurns = true;
+    let slideTimeout;
+    const fadeDuration = 2000; // ms for fade in/out
+
+    // Preload buffer to always hold at least 4 images ahead.
+    let preloadBuffer = [];
+
+    // Pointer idle timer (for full screen)
+    let pointerTimeout;
+    function resetMouseIdleTimer() {
+      if (document.fullscreenElement) {
+        document.body.style.cursor = 'auto';
+        clearTimeout(pointerTimeout);
+        pointerTimeout = setTimeout(() => {
+          document.body.style.cursor = 'none';
+        }, 5000);
+      } else {
+        document.body.style.cursor = 'auto';
+        clearTimeout(pointerTimeout);
+      }
+    }
+    document.addEventListener('mousemove', resetMouseIdleTimer);
+    document.addEventListener("fullscreenchange", () => {
+      const btns = document.querySelectorAll('#fullscreen-btn, #settings-btn, #upload-btn');
+      if (document.fullscreenElement) {
+        btns.forEach(btn => btn.classList.add('hidden'));
+        resetMouseIdleTimer();
+      } else {
+        btns.forEach(btn => btn.classList.remove('hidden'));
+        document.body.style.cursor = 'auto';
+        clearTimeout(pointerTimeout);
+      }
+    });
+
+    // Fetch images from backend.
+    async function fetchImages() {
+      const response = await fetch('/images');
+      images = await response.json();
+      if (images.length > 0) {
+        loadInitialBuffer();
+      } else {
+        console.error('No images found.');
+      }
+    }
+
+    // Preload the first 4 images (any 4 files) with a progress bar.
+    function loadInitialBuffer() {
+      const progressBar = document.getElementById('progress-bar');
+      const progressContainer = document.getElementById('progress-container');
+      let initialBufferCount = Math.min(4, images.length);
+      let loadedCount = 0;
+      for (let i = 0; i < initialBufferCount; i++) {
+        let tempImg = new Image();
+        tempImg.onload = tempImg.onerror = () => {
+          loadedCount++;
+          progressBar.value = loadedCount;
+          if (loadedCount === initialBufferCount) {
+            progressContainer.style.display = 'none';
+            startSlideshow();
+          }
+        };
+        tempImg.src = `/static/images/${images[i].filename}`;
+      }
+    }
+
+    // Update preload buffer so it always holds at least 4 images ahead.
+    function updatePreloadBuffer() {
+      while (preloadBuffer.length < 4 && images.length > 0) {
+        let nextIndex = (currentIndex + preloadBuffer.length + 1) % images.length;
+        let preImg = new Image();
+        preImg.src = `/static/images/${images[nextIndex].filename}`;
+        preloadBuffer.push({ img: preImg, index: nextIndex });
+      }
+    }
+
+    // Start or restart the slideshow.
+    function startSlideshow() {
+      clearTimeout(slideTimeout);
+      const container = document.getElementById('slideshow-container');
+      container.innerHTML = '';
+      currentIndex = 0;
+      preloadBuffer = [];
+      updatePreloadBuffer();
+      showSlide();
+    }
+
+    // Fade in current image and, when fade-in completes, wait for the next preloaded image.
+    function fadeInAndSchedule(currentImg, preloadImg) {
+      void currentImg.offsetWidth;
+      setTimeout(() => {
+        currentImg.classList.add('visible');
+      }, 50);
+      
+      currentImg.addEventListener('transitionend', function onTransitionEnd(e) {
+        if (e.propertyName === 'opacity' && getComputedStyle(currentImg).opacity === "1") {
+          currentImg.removeEventListener('transitionend', onTransitionEnd);
+          waitForNextImageAndSchedule(currentImg, preloadImg);
+        }
+      });
+    }
+
+    // Wait until the first image in the preload buffer is loaded before scheduling transition.
+    function waitForNextImageAndSchedule(currentImg, preloadImg) {
+      if (preloadImg.complete) {
+        scheduleTransition(currentImg);
+      } else {
+        preloadImg.onload = () => {
+          scheduleTransition(currentImg);
+        };
+      }
+    }
+
+    // Schedule fade-out and transition after displayTime.
+    function scheduleTransition(currentImg) {
+      slideTimeout = setTimeout(() => {
+        currentImg.classList.remove('visible');
+        slideTimeout = setTimeout(() => {
+          currentImg.remove();
+          if (preloadBuffer.length > 0) {
+            preloadBuffer.shift();
+          }
+          currentIndex = (currentIndex + 1) % images.length;
+          updatePreloadBuffer();
+          showSlide();
+        }, fadeDuration);
+      }, displayTime);
+    }
+
+    // Show current slide.
+    function showSlide() {
+      const container = document.getElementById('slideshow-container');
+      const img = document.createElement('img');
+      img.src = `/static/images/${images[currentIndex].filename}`;
+      container.appendChild(img);
+      
+      updatePreloadBuffer();
+      
+      let nextIndex = (currentIndex + 1) % images.length;
+      let preloadImg = new Image();
+      preloadImg.src = `/static/images/${images[nextIndex].filename}`;
+      
+      if (img.complete) {
+        fadeInAndSchedule(img, preloadImg);
+      } else {
+        img.onload = () => {
+          fadeInAndSchedule(img, preloadImg);
+        };
+      }
+      
+      if (kenBurns) {
+        img.style.setProperty('--rand-x', Math.random());
+        img.style.setProperty('--rand-y', Math.random());
+        const randomDelay = 2 + Math.random() * 3;
+        img.style.animationDelay = `${randomDelay}s`;
+        img.classList.add('ken-burns');
+      }
+      
+      currentIndex = nextIndex;
+    }
+
+    // Full screen toggle.
+    document.getElementById('fullscreen-btn').addEventListener('click', () => {
+      const elem = document.documentElement;
+      const btns = document.querySelectorAll('#fullscreen-btn, #settings-btn, #upload-btn');
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().then(() => {
+          btns.forEach(btn => btn.classList.add('hidden'));
+          resetMouseIdleTimer();
+        }).catch(err => console.error(`Error: ${err.message}`));
+      } else {
+        document.exitFullscreen().then(() => {
+          btns.forEach(btn => btn.classList.remove('hidden'));
+          document.body.style.cursor = 'auto';
+          clearTimeout(pointerTimeout);
+        });
+      }
+    });
+
+    // Settings: update display time and optionally toggle Ken Burns (the current default is true).
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      let newTime = prompt("Enter seconds per image (excluding transitions):", displayTime / 1000);
+      if (newTime !== null) {
+        displayTime = parseInt(newTime) * 1000;
+      }
+      // Optionally update kenBurns (this prompt will let you change it, but default remains true)
+      kenBurns = confirm("Enable Ken Burns effect? (OK for Yes, Cancel for No)");
+      startSlideshow();
+    });
+
+    // Upload button: trigger file selection.
+    document.getElementById('upload-btn').addEventListener('click', () => {
+      document.getElementById('file-input').click();
+    });
+    
+    // When a file is selected, upload it.
+    document.getElementById('file-input').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/upload', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => {
+          if (response.ok) {
+            alert('File uploaded successfully.');
+            fetchImages(); // Refresh images list.
+          } else {
+            alert('Upload failed.');
+          }
+        })
+        .catch(error => {
+          console.error('Upload error:', error);
+          alert('Upload error.');
+        });
+      }
+    });
+
+    // Begin by fetching images.
+    fetchImages();
+  </script>
+</body>
+</html>
