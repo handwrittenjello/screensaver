@@ -5,6 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Astrophotography Slideshow</title>
+  <!-- Include Moment.js and Moment Timezone from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.33/moment-timezone-with-data.min.js"></script>
   <style>
     /* Basic page styling */
     body {
@@ -36,7 +39,7 @@
       height: 100vh;
       object-fit: cover;
       opacity: 0;
-      transition: opacity 2s ease-in-out;
+      transition: opacity 4s ease-in-out;
     }
 
     .visible {
@@ -114,10 +117,138 @@
       margin-top: 10px;
     }
 
+    /* Clock overlay styling */
+    #clock-overlay {
+      position: absolute;
+      z-index: 1500;
+      pointer-events: none;
+      color: white;
+      font-family: 'Arial', sans-serif;
+    }
+
+    /* New overlays for current temperature and humidity */
+    #temp-overlay,
+    #humidity-overlay {
+      position: absolute;
+      pointer-events: none;
+      color: white;
+      font-family: 'Arial', sans-serif;
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid white;
+      border-radius: 10px;
+      padding: 5px 10px;
+      font-size: 80px;
+      /* same as clockSize by default */
+      z-index: 3000;
+    }
+
+    #temp-overlay {
+      top: 10px;
+      left: 10px;
+    }
+
+    #humidity-overlay {
+      top: 10px;
+      right: 10px;
+    }
+
+    /* Clock style variations */
+    .clock-style-1 {}
+
+    .clock-style-2 {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid white;
+      border-radius: 10px;
+      padding: 5px 10px;
+    }
+
+    .clock-style-3 {
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Weather module styling - text size reduced to 16px */
+    #weather-module {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 1600;
+      font-size: 16px;
+      /* Reduced text size */
+      text-align: left;
+      max-width: 600px;
+      min-height: 200px;
+    }
+
+    #weather-module h3 {
+      margin: 6px 0;
+      font-size: 16px;
+      text-transform: uppercase;
+    }
+
+    #weather-module hr {
+      border: 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+      margin: 4px 0;
+    }
+
+    .weather-header {
+      margin-bottom: 4px;
+      font-weight: bold;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .weather-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 2px 0;
+    }
+
+    .day-name {
+      width: 60px;
+      font-weight: normal;
+    }
+
+    /* Removed the Icon column from forecast rows and header */
+    .temp-hi {
+      width: 36px;
+      text-align: right;
+    }
+
+    .temp-lo {
+      width: 36px;
+      text-align: right;
+      color: #aaa;
+      margin-left: 6px;
+    }
+
+    .pop-col {
+      width: 64px;
+      text-align: right;
+      color: #aaa;
+      margin-left: 6px;
+    }
+
+    .clouds-col {
+      width: 42px;
+      text-align: right;
+      color: #aaa;
+      margin-left: 6px;
+    }
+
+    .moon-info {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #ccc;
+    }
+
     /* Modal styling */
     .modal {
       display: none;
-      /* Hidden by default */
       position: fixed;
       z-index: 3000;
       left: 0;
@@ -170,55 +301,99 @@
 </head>
 
 <body>
-  <!-- Buttons -->
   <button id="fullscreen-btn">Full Screen</button>
   <button id="settings-btn">Settings</button>
   <button id="upload-btn">Upload Image</button>
-  <!-- Hidden file input for image uploads -->
-  <input type="file" id="file-input" accept="image/*" />
-
-  <!-- Progress bar container (visible during initial loading) -->
+  <input type="file" id="file-input" accept="image/*">
   <div id="progress-container">
     Loading images...
-    <br />
+    <br>
     <progress id="progress-bar" value="0" max="4"></progress>
   </div>
-
   <div id="slideshow-container"></div>
-
-  <!-- Settings Modal -->
+  <div id="clock-overlay"></div>
+  <!-- New overlays for current temperature and humidity -->
+  <div id="temp-overlay"></div>
+  <div id="humidity-overlay"></div>
+  <div id="weather-module"></div>
   <div id="settings-modal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
       <h2>Settings</h2>
       <label for="display-time">Display Time (seconds):</label>
-      <input type="number" id="display-time" value="30" min="1" />
+      <input type="number" id="display-time" value="60" min="1">
       <label>
-        <input type="checkbox" id="ken-burns-checkbox" checked />
+        <input type="checkbox" id="ken-burns-checkbox" checked>
         Enable Ken Burns Effect
       </label>
+      <label for="ken-burns-speed">Ken Burns Duration (seconds):</label>
+      <input type="number" id="ken-burns-speed" value="45" min="1" step="1">
       <h3>Select Images to Display:</h3>
       <div id="image-selection">
-        <!-- Dynamically populated list of images with checkboxes -->
+        <!-- Dynamically populated -->
       </div>
+      <h3>Clock Settings</h3>
+      <label for="clock-size">Clock Size (px):</label>
+      <input type="number" id="clock-size" value="80" min="10">
+      <label for="clock-position">Clock Position:</label>
+      <select id="clock-position">
+        <option value="top-left">Top Left</option>
+        <option value="top-right">Top Right</option>
+        <option value="bottom-left" selected>Bottom Left</option>
+        <option value="bottom-right">Bottom Right</option>
+        <option value="center">Center</option>
+      </select>
+      <label for="clock-style">Clock Style:</label>
+      <select id="clock-style">
+        <option value="style1" selected>Style 1</option>
+        <option value="style2">Style 2</option>
+        <option value="style3">Style 3</option>
+      </select>
+      <label for="time-format">Time Format:</label>
+      <select id="time-format">
+        <option value="24h-HH:MM">24h (HH:MM)</option>
+        <option value="24h-HH:MM:SS">24h (HH:MM:SS)</option>
+        <option value="12h-HH:MM" selected>12h (HH:MM)</option>
+        <option value="12h-HH:MM:SS">12h (HH:MM:SS)</option>
+      </select>
       <button id="save-settings">Save</button>
     </div>
   </div>
-
   <script>
-    // Global variables
-    let images = [];             // Full list from backend
-    let selectedImages = [];     // Initially, all images are selected
+    // Helper: Capitalize the first letter of each sentence.
+    function capitalizeSentences(text) {
+      return text.replace(/(^\s*\w|[\.\!\?]\s*\w)/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+    // Helper: Return the icon URL.
+    function getIconUrl(icon) {
+      if (icon.startsWith("http")) {
+        return icon;
+      } else {
+        return `https://openweathermap.org/img/wn/${icon}.png`;
+      }
+    }
+    // Global variables for slideshow, clock, weather, and image order
+    let images = [];
+    let selectedImages = [];
+    let displayOrder = []; // A randomized array of selected images.
     let currentIndex = 0;
-    let displayTime = 30000;     // 30 seconds in ms
-    let kenBurns = true;         // Ken Burns effect enabled by default
+    let displayTime = 60000;
+    let kenBurns = true;
+    let kenBurnsSpeed = 45;
     let slideTimeout;
-    const fadeDuration = 2000;   // Fade in/out duration in ms
-
-    // Preload buffer: an array to hold at least 4 images ahead.
+    const fadeDuration = 4000;
+    // Preload buffer
     let preloadBuffer = [];
-
-    // Pointer idle timer (for hiding the mouse cursor in full screen)
+    // Clock defaults
+    let clockSize = 80;
+    let clockPosition = "bottom-left";
+    let clockStyle = "style1";
+    let timeFormat = "12h-HH:MM";
+    // Weather update interval (15 minutes)
+    const weatherUpdateInterval = 900000;
+    // Pointer idle timer
     let pointerTimeout;
     function resetMouseIdleTimer() {
       if (document.fullscreenElement) {
@@ -244,16 +419,15 @@
         clearTimeout(pointerTimeout);
       }
     });
-
-    // Full screen helper functions with vendor prefix fallbacks.
+    // Full screen helper functions
     function launchIntoFullscreen(element) {
       if (element.requestFullscreen) {
         return element.requestFullscreen();
-      } else if (element.mozRequestFullScreen) { // Firefox
+      } else if (element.mozRequestFullScreen) {
         return element.mozRequestFullScreen();
-      } else if (element.webkitRequestFullscreen) { // Chrome, Safari, Opera
+      } else if (element.webkitRequestFullscreen) {
         return element.webkitRequestFullscreen();
-      } else if (element.msRequestFullscreen) { // IE/Edge
+      } else if (element.msRequestFullscreen) {
         return element.msRequestFullscreen();
       }
     }
@@ -268,7 +442,6 @@
         return document.msExitFullscreen();
       }
     }
-    // Full screen toggle event listener.
     document.getElementById('fullscreen-btn').addEventListener('click', () => {
       const elem = document.documentElement;
       const btns = document.querySelectorAll('#fullscreen-btn, #settings-btn, #upload-btn');
@@ -286,25 +459,226 @@
         clearTimeout(pointerTimeout);
       }
     });
-
-    // Fetch images from the backend.
+    // Clock overlay functions using Moment.js
+    function updateTime() {
+      const clockEl = document.getElementById('clock-overlay');
+      let formatString;
+      if (timeFormat.startsWith("24h")) {
+        formatString = timeFormat.includes("HH:MM:SS") ? "HH:mm:ss" : "HH:mm";
+      } else {
+        formatString = timeFormat.includes("HH:MM:SS") ? "h:mm:ss a" : "h:mm a";
+      }
+      clockEl.textContent = moment().format(formatString);
+      const delay = 1000 - moment().milliseconds() + 50;
+      setTimeout(updateTime, delay);
+    }
+    updateTime();
+    function updateClockOverlay() {
+      const clockEl = document.getElementById('clock-overlay');
+      clockEl.style.fontSize = clockSize + 'px';
+      clockEl.classList.remove('clock-style-1', 'clock-style-2', 'clock-style-3');
+      clockEl.classList.add('clock-' + clockStyle);
+      clockEl.style.top = '';
+      clockEl.style.bottom = '';
+      clockEl.style.left = '';
+      clockEl.style.right = '';
+      clockEl.style.transform = '';
+      switch (clockPosition) {
+        case 'top-left':
+          clockEl.style.top = '10px';
+          clockEl.style.left = '10px';
+          break;
+        case 'top-right':
+          clockEl.style.top = '10px';
+          clockEl.style.right = '10px';
+          break;
+        case 'bottom-left':
+          clockEl.style.bottom = '10px';
+          clockEl.style.left = '10px';
+          break;
+        case 'bottom-right':
+          clockEl.style.bottom = '10px';
+          clockEl.style.right = '10px';
+          break;
+        case 'center':
+          clockEl.style.top = '50%';
+          clockEl.style.left = '50%';
+          clockEl.style.transform = 'translate(-50%, -50%)';
+          break;
+        default:
+          clockEl.style.top = '10px';
+          clockEl.style.right = '10px';
+      }
+    }
+    updateClockOverlay();
+    // New function to update the temperature and humidity overlays
+    function updateTempHumidity(data) {
+      let current = data.current || {};
+      const tempOverlay = document.getElementById('temp-overlay');
+      const humidityOverlay = document.getElementById('humidity-overlay');
+      tempOverlay.textContent = (current.temp !== undefined ? Math.round(current.temp) + "°F" : "N/A");
+      humidityOverlay.textContent = (current.humidity !== undefined ? current.humidity + "%" : "N/A");
+    }
+    // Weather module functions
+    function updateWeather() {
+      fetch('/weather')
+        .then(response => response.json())
+        .then(data => {
+          renderWeatherMinimal(data);
+          updateTempHumidity(data);
+        })
+        .catch(error => {
+          console.error('Error fetching weather data:', error);
+        });
+    }
+    function formatPrecip(pop, rain, snow, units) {
+      if (!pop) return "";
+      let amount = rain || snow || 0;
+      if (amount > 0) {
+        return (units === "imperial")
+          ? (amount * 0.0394).toFixed(2) + '"'
+          : amount.toFixed(1) + "mm";
+      }
+      return "Rain";
+    }
+    function renderWeatherMinimal(data) {
+      let weatherModule = document.getElementById('weather-module');
+      if (!data) {
+        weatherModule.innerHTML = "<div>Unable to load weather data</div>";
+        return;
+      }
+      let html = `<div class="weather-header">Weather Forecast</div>
+                  <hr>`;
+      // "Now:" row using OWM current data
+      let current = data.current || {};
+      let cIcon = current.weather?.icon || "01d";
+      let cDesc = current.weather?.description || "";
+      cDesc = capitalizeSentences(cDesc);
+      let cUnits = current.units || "imperial";
+      let cVis = "";
+      if (current.visibility !== undefined) {
+        cVis = cUnits === "imperial"
+          ? (current.visibility / 1609.34).toFixed(1) + " mi"
+          : (current.visibility / 1000).toFixed(1) + " km";
+      }
+      let cAstroLine = [
+        current.clouds !== undefined ? current.clouds + "% clouds" : "",
+        cVis ? "Vis: " + cVis : "",
+        current.dew_point !== undefined ? "Dew: " + Math.round(current.dew_point) + "°" : "",
+        current.wind_speed !== undefined ? "Wind: " + Math.round(current.wind_speed) + (cUnits === "imperial" ? " mph" : " m/s") : ""
+      ].filter(Boolean).join("  |  ");
+      let nowHTML = `<div class="weather-row">
+          <span>Now: ${Math.round(current.temp)}°F, ${current.humidity}%</span>
+          <img src="https://openweathermap.org/img/wn/${cIcon}.png" alt="${cDesc}" style="vertical-align: middle; height: 28px; margin-left: 6px;">
+        </div>
+        <div style="font-size: 13px; margin-top: 2px;">${cDesc}</div>
+        ${cAstroLine ? `<div style="font-size: 13px; color: #ccc; margin-top: 2px; margin-bottom: 6px;">${cAstroLine}</div>` : `<div style="margin-bottom: 6px;"></div>`}
+        <hr>`;
+      html += nowHTML;
+      // "Today:" row using OWM daily[0] with description on its own new line
+      let today = data.today || {};
+      let todayHigh = today.temp_max ? Math.round(today.temp_max) : "N/A";
+      let todayLow = today.temp_min ? Math.round(today.temp_min) : "N/A";
+      let todayPop = formatPrecip(today.pop, today.rain, today.snow, data.current?.units || "imperial");
+      let todayIcon = today.weather?.icon || "";
+      let todaySummary = today.summary || "";
+      todaySummary = capitalizeSentences(todaySummary);
+      let todayClouds = (today.clouds != null) ? today.clouds + "%" : "—";
+      let todayHTML = `<div class="weather-row">
+          <span class="day-name">Today</span>
+          <span class="temp-hi">${todayHigh}°</span>
+          <span class="temp-lo">${todayLow}°</span>
+          <span class="pop-col">${todayPop}</span>
+          <span class="clouds-col">${todayClouds}</span>
+        </div>
+        <div style="margin-bottom: 6px; font-size: 13px; display:block;">
+          ${todaySummary}
+        </div>
+        <hr>`;
+      html += todayHTML;
+      // Forecast header row (without Icon column)
+      html += `<div class="weather-row" style="font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.3); margin-bottom:4px;">
+            <span class="day-name">Day</span>
+            <span class="temp-hi">High</span>
+            <span class="temp-lo">Low</span>
+            <span class="pop-col">Precip</span>
+            <span class="clouds-col">Clouds</span>
+          </div>`;
+      // 7-Day forecast (daily[1] through daily[7])
+      let forecast = data.forecast || [];
+      forecast.forEach((fday, index) => {
+        let dTemp = fday.temp || {};
+        let dHigh = dTemp.max ? Math.round(dTemp.max) : (dTemp.day ? Math.round(dTemp.day) : "N/A");
+        let dLow = dTemp.min ? Math.round(dTemp.min) : "";
+        let dPop = formatPrecip(fday.pop, fday.rain, fday.snow, data.current?.units || "imperial");
+        let dClouds = (fday.clouds != null) ? fday.clouds + "%" : "—";
+        let dayLabel = (index === 0) ? "Tomorrow" : (fday.dt ? moment.unix(fday.dt).format("ddd") : "Day " + (index + 2));
+        html += `<div class="weather-row">
+            <span class="day-name">${dayLabel}</span>
+            <span class="temp-hi">${dHigh}°</span>
+            <span class="temp-lo">${dLow ? dLow + "°" : ""}</span>
+            <span class="pop-col">${dPop}</span>
+            <span class="clouds-col">${dClouds}</span>
+          </div>`;
+      });
+      // Moon info
+      let moonPhaseDecimal = today.moon_phase !== undefined ? today.moon_phase : null;
+      let moonPhasePercent = moonPhaseDecimal !== null ? Math.round(moonPhaseDecimal * 100) + "%" : "N/A";
+      let moonrise = today.moonrise ? moment.unix(today.moonrise).format("h:mm a") : "N/A";
+      let moonset = today.moonset ? moment.unix(today.moonset).format("h:mm a") : "N/A";
+      let moonHTML = `<div class="moon-info">
+          <strong>Moon:</strong> Phase: ${moonPhasePercent}<br>
+          Moonrise: ${moonrise}, Moonset: ${moonset}
+        </div>`;
+      html += `<hr>` + moonHTML;
+      // Weather alerts
+      let alerts = data.alerts || [];
+      if (alerts.length > 0) {
+        html += `<hr><div class="moon-info" style="color: #ffaa44;">`;
+        alerts.forEach(alert => {
+          let alertStart = alert.start ? moment.unix(alert.start).format("ddd h:mm a") : "";
+          let alertEnd = alert.end ? moment.unix(alert.end).format("ddd h:mm a") : "";
+          let desc = alert.description
+            ? (alert.description.length > 120 ? alert.description.substring(0, 120) + "…" : alert.description)
+            : "";
+          html += `<strong>⚠ ${alert.event}</strong><br>`;
+          if (alertStart) html += `${alertStart} – ${alertEnd}<br>`;
+          if (desc) html += `<span style="font-size:12px;">${desc}</span>`;
+        });
+        html += `</div>`;
+      }
+      weatherModule.innerHTML = html;
+    }
+    updateWeather();
+    setInterval(updateWeather, weatherUpdateInterval);
+    // Shuffling function for arrays (Fisher-Yates)
+    function shuffleArray(arr) {
+      let array = arr.slice();
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+    // Slideshow functions
     async function fetchImages() {
       const response = await fetch('/images');
       images = await response.json();
-      // Initially, all images are selected.
+      // Initially, all images are selected from the settings.
       selectedImages = [...images];
-      if (selectedImages.length > 0) {
+      // Create a random order from selectedImages
+      displayOrder = shuffleArray(selectedImages);
+      currentIndex = 0;
+      if (displayOrder.length > 0) {
         loadInitialBuffer();
       } else {
         console.error('No images found.');
       }
     }
-
-    // Preload the first 4 images and update the progress bar.
     function loadInitialBuffer() {
       const progressBar = document.getElementById('progress-bar');
       const progressContainer = document.getElementById('progress-container');
-      let initialBufferCount = Math.min(4, selectedImages.length);
+      let initialBufferCount = Math.min(4, displayOrder.length);
       let loadedCount = 0;
       for (let i = 0; i < initialBufferCount; i++) {
         let tempImg = new Image();
@@ -316,38 +690,37 @@
             startSlideshow();
           }
         };
-        tempImg.src = `/static/images/${selectedImages[i].filename}`;
+        tempImg.src = `/static/images/${displayOrder[i].filename}`;
       }
     }
-
-    // Ensure our preload buffer always holds at least 4 images ahead.
     function updatePreloadBuffer() {
-      while (preloadBuffer.length < 4 && selectedImages.length > 0) {
-        let nextIndex = (currentIndex + preloadBuffer.length + 1) % selectedImages.length;
+      while (preloadBuffer.length < 4 && displayOrder.length > 0) {
+        let nextIndex = (currentIndex + preloadBuffer.length + 1);
+        if (nextIndex >= displayOrder.length) {
+          displayOrder = shuffleArray(selectedImages);
+          currentIndex = 0;
+          preloadBuffer = [];
+          nextIndex = 1;
+        }
         let preImg = new Image();
-        preImg.src = `/static/images/${selectedImages[nextIndex].filename}`;
+        preImg.src = `/static/images/${displayOrder[nextIndex].filename}`;
         preloadBuffer.push({ img: preImg, index: nextIndex });
       }
     }
-
-    // Start (or restart) the slideshow.
     function startSlideshow() {
       clearTimeout(slideTimeout);
       const container = document.getElementById('slideshow-container');
-      container.innerHTML = '';  // Clear any existing images.
+      container.innerHTML = '';
       currentIndex = 0;
-      preloadBuffer = [];  // Clear the preload buffer.
+      preloadBuffer = [];
       updatePreloadBuffer();
       showSlide();
     }
-
-    // Fade in the current image and, when fade-in is complete, wait for the next preloaded image to load.
     function fadeInAndSchedule(currentImg, preloadImg) {
       void currentImg.offsetWidth;
       setTimeout(() => {
         currentImg.classList.add('visible');
       }, 50);
-
       currentImg.addEventListener('transitionend', function onTransitionEnd(e) {
         if (e.propertyName === 'opacity' && getComputedStyle(currentImg).opacity === "1") {
           currentImg.removeEventListener('transitionend', onTransitionEnd);
@@ -355,8 +728,6 @@
         }
       });
     }
-
-    // Wait until the first image in the preload buffer is loaded; then schedule the transition.
     function waitForNextImageAndSchedule(currentImg, preloadImg) {
       if (preloadImg.complete) {
         scheduleTransition(currentImg);
@@ -366,8 +737,6 @@
         };
       }
     }
-
-    // Schedule the fade-out transition after displayTime, then move to the next image.
     function scheduleTransition(currentImg) {
       slideTimeout = setTimeout(() => {
         currentImg.classList.remove('visible');
@@ -376,26 +745,31 @@
           if (preloadBuffer.length > 0) {
             preloadBuffer.shift();
           }
-          currentIndex = (currentIndex + 1) % selectedImages.length;
+          currentIndex++;
+          if (currentIndex >= displayOrder.length) {
+            // Generate a new random order when the current order is exhausted.
+            displayOrder = shuffleArray(selectedImages);
+            currentIndex = 0;
+            preloadBuffer = [];
+          }
           updatePreloadBuffer();
           showSlide();
         }, fadeDuration);
       }, displayTime);
     }
-
-    // Show the current slide.
     function showSlide() {
       const container = document.getElementById('slideshow-container');
       const img = document.createElement('img');
-      img.src = `/static/images/${selectedImages[currentIndex].filename}`;
+      img.src = `/static/images/${displayOrder[currentIndex].filename}`;
       container.appendChild(img);
-
       updatePreloadBuffer();
-
-      let nextIndex = (currentIndex + 1) % selectedImages.length;
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= displayOrder.length) {
+        displayOrder = shuffleArray(selectedImages);
+        nextIndex = 0;
+      }
       let preloadImg = new Image();
-      preloadImg.src = `/static/images/${selectedImages[nextIndex].filename}`;
-
+      preloadImg.src = `/static/images/${displayOrder[nextIndex].filename}`;
       if (img.complete) {
         fadeInAndSchedule(img, preloadImg);
       } else {
@@ -403,43 +777,36 @@
           fadeInAndSchedule(img, preloadImg);
         };
       }
-
       if (kenBurns) {
         img.style.setProperty('--rand-x', Math.random());
         img.style.setProperty('--rand-y', Math.random());
         const randomDelay = 2 + Math.random() * 3;
         img.style.animationDelay = `${randomDelay}s`;
+        img.style.animationDuration = `${kenBurnsSpeed}s`;
         img.classList.add('ken-burns');
       }
-
-      currentIndex = nextIndex;
     }
-
-    // Modal functionality
     const modal = document.getElementById('settings-modal');
     const closeModalBtn = document.querySelector('#settings-modal .close');
-
-    // Open modal when settings button is clicked.
     document.getElementById('settings-btn').addEventListener('click', () => {
       modal.style.display = 'block';
-      // Set form values.
       document.getElementById('display-time').value = displayTime / 1000;
       document.getElementById('ken-burns-checkbox').checked = kenBurns;
+      document.getElementById('ken-burns-speed').value = kenBurnsSpeed;
+      document.getElementById('clock-size').value = clockSize;
+      document.getElementById('clock-position').value = clockPosition;
+      document.getElementById('clock-style').value = clockStyle;
+      document.getElementById('time-format').value = timeFormat;
       populateImageSelection();
     });
-
-    // Close modal when close button is clicked.
     closeModalBtn.addEventListener('click', () => {
       modal.style.display = 'none';
     });
-    // Close modal if user clicks outside the modal content.
     window.addEventListener('click', (event) => {
       if (event.target === modal) {
         modal.style.display = 'none';
       }
     });
-
-    // Populate the image selection list in the modal.
     function populateImageSelection() {
       const container = document.getElementById('image-selection');
       container.innerHTML = '';
@@ -453,12 +820,16 @@
         container.appendChild(div);
       });
     }
-
-    // Save modal settings.
     document.getElementById('save-settings').addEventListener('click', () => {
-      const dt = document.getElementById('display-time').value;
+      let dt = document.getElementById('display-time').value;
       displayTime = parseInt(dt) * 1000;
       kenBurns = document.getElementById('ken-burns-checkbox').checked;
+      kenBurnsSpeed = parseInt(document.getElementById('ken-burns-speed').value);
+      clockSize = parseInt(document.getElementById('clock-size').value);
+      clockPosition = document.getElementById('clock-position').value;
+      clockStyle = document.getElementById('clock-style').value;
+      timeFormat = document.getElementById('time-format').value;
+      updateClockOverlay();
       const checkboxes = document.querySelectorAll('#image-selection input[type="checkbox"]');
       selectedImages = [];
       checkboxes.forEach((checkbox, index) => {
@@ -470,11 +841,12 @@
         alert("At least one image must be selected. Reverting to all images.");
         selectedImages = [...images];
       }
+      // Generate new random order from selectedImages.
+      displayOrder = shuffleArray(selectedImages);
+      currentIndex = 0;
       modal.style.display = 'none';
       startSlideshow();
     });
-
-    // Upload functionality.
     document.getElementById('upload-btn').addEventListener('click', () => {
       document.getElementById('file-input').click();
     });
@@ -490,7 +862,7 @@
           .then(response => {
             if (response.ok) {
               alert('File uploaded successfully.');
-              fetchImages(); // Refresh image list.
+              fetchImages();
             } else {
               alert('Upload failed.');
             }
@@ -501,8 +873,6 @@
           });
       }
     });
-
-    // Begin by fetching images.
     fetchImages();
   </script>
 </body>
