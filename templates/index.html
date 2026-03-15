@@ -246,6 +246,23 @@
       color: #ccc;
     }
 
+    /* Battery monitor widget */
+    #battery-module {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 12px 15px;
+      border-radius: 8px;
+      z-index: 1600;
+      font-size: 16px;
+      font-family: 'Arial', sans-serif;
+      text-align: left;
+      min-width: 150px;
+      pointer-events: none;
+    }
+
     /* Modal styling */
     .modal {
       display: none;
@@ -316,6 +333,7 @@
   <div id="temp-overlay"></div>
   <div id="humidity-overlay"></div>
   <div id="weather-module"></div>
+  <div id="battery-module"></div>
   <div id="settings-modal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
@@ -651,6 +669,56 @@
     }
     updateWeather();
     setInterval(updateWeather, weatherUpdateInterval);
+    // Battery monitor
+    function socColor(soc) {
+      if (soc > 60) return "#4caf50";
+      if (soc >= 40) return "#ffcc00";
+      return "#f44336";
+    }
+    function formatTTG(ttg_min) {
+      if (ttg_min == null || ttg_min === -1) return "Charging";
+      const h = Math.floor(ttg_min / 60);
+      const m = ttg_min % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+    function renderBattery(data) {
+      const el = document.getElementById('battery-module');
+      if (!data || data.error) {
+        el.innerHTML = `
+          <div class="weather-header">Battery</div>
+          <hr>
+          <div style="font-size: 13px; color: #aaa; padding: 4px 0;">Offline</div>`;
+        return;
+      }
+      const soc = data.soc_pct;
+      const ttg = formatTTG(data.ttg_min);
+      const alarmStyle = data.alarm !== 'OFF' ? 'color: #ffaa44; font-weight: bold;' : 'color: #aaa;';
+      function flowColor(val) {
+        if (val > 0) return 'color: #4caf50;';
+        if (val < 0) return 'color: #f44336;';
+        return 'color: white;';
+      }
+      el.innerHTML = `
+        <div class="weather-header">Battery</div>
+        <hr>
+        <div style="font-size: 36px; font-weight: bold; color: ${socColor(soc)}; text-align: center; line-height: 1.2;">${soc.toFixed(1)}%</div>
+        <hr>
+        <div style="font-size: 13px; color: #ccc; margin-top: 2px;">
+          ${data.voltage_V.toFixed(2)}V
+          &nbsp;<span style="${flowColor(data.current_A)}">${data.current_A.toFixed(2)}A</span>
+          &nbsp;<span style="${flowColor(data.power_W)}">${data.power_W}W</span>
+        </div>
+        <div style="font-size: 13px; color: #ccc; margin-top: 2px;">TTG: ${ttg}</div>
+        <div style="font-size: 13px; margin-top: 2px; ${alarmStyle}">Alarm: ${data.alarm}</div>`;
+    }
+    function updateBattery() {
+      fetch('/battery')
+        .then(r => r.json())
+        .then(data => renderBattery(data))
+        .catch(() => renderBattery(null));
+    }
+    updateBattery();
+    setInterval(updateBattery, 10000);
     // Shuffling function for arrays (Fisher-Yates)
     function shuffleArray(arr) {
       let array = arr.slice();

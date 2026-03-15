@@ -98,6 +98,15 @@ def weather():
 
     return jsonify(simplified)
 
+@app.route('/battery')
+def battery():
+    try:
+        response = requests.get("http://sdr:5000/api/latest", timeout=3)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except Exception:
+        return jsonify({"error": "offline"}), 503
+
 @app.route('/images')
 def images():
     """
