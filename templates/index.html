@@ -263,6 +263,36 @@
       pointer-events: none;
     }
 
+    /* Planes overhead widget */
+    #flights-module {
+      position: absolute;
+      right: 20px;
+      top: 160px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 12px 15px;
+      border-radius: 8px;
+      z-index: 1600;
+      font-size: 14px;
+      font-family: 'Arial', sans-serif;
+      text-align: left;
+      min-width: 260px;
+      max-width: 340px;
+      pointer-events: none;
+    }
+
+    .flight-callsign {
+      font-weight: bold;
+      color: white;
+      min-width: 70px;
+    }
+
+    .flight-route {
+      color: #aaa;
+      font-size: 12px;
+      flex: 1;
+      margin: 0 6px;
+    }
+
     /* Modal styling */
     .modal {
       display: none;
@@ -334,6 +364,7 @@
   <div id="humidity-overlay"></div>
   <div id="weather-module"></div>
   <div id="battery-module"></div>
+  <div id="flights-module"></div>
   <div id="settings-modal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
@@ -719,6 +750,52 @@
     }
     updateBattery();
     setInterval(updateBattery, 10000);
+    // Planes overhead widget
+    function degreesToCompass(deg) {
+      if (deg === null || deg === undefined) return '—';
+      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
+                    'S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      return dirs[Math.round(deg / 22.5) % 16];
+    }
+    function renderFlights(data) {
+      const el = document.getElementById('flights-module');
+      if (!data || data.error) {
+        el.innerHTML = `<div class="weather-header">Planes Overhead</div><hr>
+          <div style="font-size:13px;color:#aaa;padding:4px 0;">Flight data offline</div>`;
+        return;
+      }
+      const flights = data.flights || [];
+      let html = `<div class="weather-header">Planes Overhead</div><hr>`;
+      if (flights.length === 0) {
+        html += `<div style="font-size:13px;color:#aaa;padding:4px 0;">No flights within 7 mi</div>`;
+      } else {
+        flights.forEach(f => {
+          const fmtAirport = (city, code) => city ? `${city} (${code})` : code;
+          const route = (f.origin && f.destination)
+            ? `${fmtAirport(f.origin_city, f.origin)} → ${fmtAirport(f.destination_city, f.destination)}`
+            : '';
+          const alt   = f.altitude_ft !== null ? f.altitude_ft.toLocaleString() + ' ft' : '';
+          const spd   = f.speed_mph   !== null ? f.speed_mph + ' mph' : '';
+          const stats = [alt, spd, f.distance_mi + ' mi', degreesToCompass(f.heading_deg)]
+                          .filter(Boolean).join('  ');
+          html += `
+            <div style="display:flex;align-items:baseline;margin:3px 0;">
+              <span class="flight-callsign">${f.callsign}</span>
+              <span class="flight-route">${route}</span>
+            </div>
+            <div style="font-size:12px;color:#aaa;margin-bottom:5px;">${stats}</div>`;
+        });
+      }
+      el.innerHTML = html;
+    }
+    function updateFlights() {
+      fetch('/flights')
+        .then(r => r.json())
+        .then(data => renderFlights(data))
+        .catch(() => renderFlights(null));
+    }
+    updateFlights();
+    setInterval(updateFlights, 30000);
     // Shuffling function for arrays (Fisher-Yates)
     function shuffleArray(arr) {
       let array = arr.slice();
