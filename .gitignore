@@ -1,3 +1,5 @@
 static/images
+static/aircraft_types
 config/
 bruno/environments/local.bru
+data/routes.db
