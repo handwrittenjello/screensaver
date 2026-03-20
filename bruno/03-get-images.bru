@@ -1,0 +1,39 @@
+meta {
+  name: Get Images
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/images
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is JSON array", function() {
+    const data = res.getBody();
+    expect(data).to.be.an("array");
+  });
+
+  test("Each item has a filename", function() {
+    const data = res.getBody();
+    data.forEach(function(item) {
+      expect(item).to.have.property("filename");
+      expect(item.filename).to.be.a("string");
+    });
+  });
+
+  test("Filenames are valid image extensions", function() {
+    const data = res.getBody();
+    const validExts = [".png", ".jpg", ".jpeg", ".gif"];
+    data.forEach(function(item) {
+      const ext = item.filename.toLowerCase().slice(item.filename.lastIndexOf("."));
+      expect(validExts).to.include(ext);
+    });
+  });
+}

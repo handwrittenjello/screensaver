@@ -1,0 +1,25 @@
+meta {
+  name: Upload - Bad File Type (400)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/upload
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  file: @file(./test-assets/test.txt): text/plain
+}
+
+tests {
+  test("Status is 400 for disallowed file type", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+
+  test("Response body indicates type not allowed", function() {
+    expect(res.getBody()).to.include("not allowed");
+  });
+}

@@ -1,0 +1,39 @@
+meta {
+  name: Get Flights
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/flights
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has flights array", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("flights");
+    expect(data.flights).to.be.an("array");
+  });
+
+  test("Each flight has required fields", function() {
+    const data = res.getBody();
+    data.flights.forEach(function(f) {
+      expect(f).to.have.property("callsign");
+      expect(f).to.have.property("distance_mi");
+      expect(f.distance_mi).to.be.at.most(5);
+    });
+  });
+
+  test("Flights sorted by distance ascending", function() {
+    const flights = res.getBody().flights;
+    for (let i = 1; i < flights.length; i++) {
+      expect(flights[i].distance_mi).to.be.at.least(flights[i - 1].distance_mi);
+    }
+  });
+}

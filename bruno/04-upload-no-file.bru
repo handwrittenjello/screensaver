@@ -1,0 +1,25 @@
+meta {
+  name: Upload - No File (400)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/upload
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+
+}
+
+tests {
+  test("Status is 400 when no file provided", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+
+  test("Response body indicates missing file", function() {
+    expect(res.getBody()).to.include("No file part");
+  });
+}

@@ -1,0 +1,94 @@
+meta {
+  name: OpenSky Flights Aircraft Raw (Debug)
+  type: http
+  seq: 13
+}
+
+get {
+  url: https://opensky-network.org/api/flights/aircraft?icao24={{testHex}}&begin={{beginTime}}&end={{endTime}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{openskyToken}}
+}
+
+vars:pre-request {
+  testHex: a4d29a
+}
+
+script:pre-request {
+  const now = Math.floor(Date.now() / 1000);
+  bru.setVar("endTime", now);
+  bru.setVar("beginTime", now - 86400);
+
+  const clientId     = bru.getEnvVar("openskyClientId");
+  const clientSecret = bru.getEnvVar("openskyClientSecret");
+
+  if (!clientId || !clientSecret) {
+    throw new Error("openskyClientId and openskyClientSecret must be set in your local.bru environment");
+  }
+
+  const tokenUrl = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
+
+  const body = "grant_type=client_credentials"
+    + "&client_id="     + encodeURIComponent(clientId)
+    + "&client_secret=" + encodeURIComponent(clientSecret);
+
+  const res = await axios.post(
+    tokenUrl,
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+
+  bru.setVar("openskyToken", res.data.access_token);
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is an array", function() {
+    const data = res.getBody();
+    expect(data).to.be.an("array");
+  });
+
+  test("Each flight record has departure and arrival fields", function() {
+    const flights = res.getBody();
+    flights.forEach(function(f) {
+      expect(f).to.have.property("estDepartureAirport");
+      expect(f).to.have.property("estArrivalAirport");
+      expect(f).to.have.property("firstSeen");
+      expect(f).to.have.property("callsign");
+    });
+  });
+
+  test("Departure airport follows ICAO format when present", function() {
+    const flights = res.getBody();
+    flights.forEach(function(f) {
+      if (f.estDepartureAirport) {
+        expect(f.estDepartureAirport).to.match(/^[A-Z]{4}$/, "ICAO codes are 4 uppercase letters");
+      }
+    });
+  });
+
+  test("Log most recent flight route for this aircraft", function() {
+    const flights = res.getBody();
+    if (flights.length === 0) {
+      console.log("No flight history found for hex: " + bru.getVar("testHex"));
+    } else {
+      const sorted = flights.slice().sort(function(a, b) {
+        return b.firstSeen - a.firstSeen;
+      });
+      const best = sorted[0];
+      const dep = best.estDepartureAirport || "unknown";
+      const arr = best.estArrivalAirport || "unknown";
+      const cs  = (best.callsign || "").trim();
+      console.log("Most recent: " + cs + " | " + dep + " -> " + arr);
+      console.log("firstSeen: " + new Date(best.firstSeen * 1000).toISOString());
+    }
+    expect(flights.length).to.be.at.least(0);
+  });
+}

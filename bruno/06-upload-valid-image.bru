@@ -1,0 +1,25 @@
+meta {
+  name: Upload - Valid Image (200)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/upload
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  file: @file(../static/images/Full_3-7-2026.jpg): image/jpeg
+}
+
+tests {
+  test("Status is 200 for valid image", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response confirms upload success", function() {
+    expect(res.getBody()).to.include("successfully");
+  });
+}

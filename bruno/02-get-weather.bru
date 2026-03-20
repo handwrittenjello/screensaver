@@ -1,0 +1,80 @@
+meta {
+  name: Get Weather
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/weather
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is JSON", function() {
+    expect(res.getHeader("content-type")).to.include("application/json");
+  });
+
+  test("Has current conditions", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("current");
+    expect(data.current.temp).to.be.a("number");
+    expect(data.current.humidity).to.be.a("number");
+    expect(data.current.clouds).to.be.a("number");
+    expect(data.current.visibility).to.be.a("number");
+    expect(data.current.dew_point).to.be.a("number");
+    expect(data.current.wind_speed).to.be.a("number");
+    expect(data.current.units).to.be.a("string");
+  });
+
+  test("Has today forecast", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("today");
+    expect(data.today.temp_max).to.be.a("number");
+    expect(data.today.temp_min).to.be.a("number");
+    expect(data.today.pop).to.be.a("number");
+    expect(data.today.clouds).to.be.a("number");
+    expect(data.today.moon_phase).to.be.a("number");
+    expect(data.today.moonrise).to.be.a("number");
+    expect(data.today.moonset).to.be.a("number");
+  });
+
+  test("Has 7-day forecast", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("forecast");
+    expect(data.forecast).to.be.an("array");
+    expect(data.forecast.length).to.be.at.least(1);
+    const day = data.forecast[0];
+    expect(day).to.have.property("dt");
+    expect(day).to.have.property("temp");
+    expect(day).to.have.property("pop");
+    expect(day).to.have.property("clouds");
+  });
+
+  test("Has alerts array", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("alerts");
+    expect(data.alerts).to.be.an("array");
+  });
+
+  test("pop values are in 0-1 range", function() {
+    const data = res.getBody();
+    data.forecast.forEach(function(day) {
+      if (day.pop !== null && day.pop !== undefined) {
+        expect(day.pop).to.be.at.least(0);
+        expect(day.pop).to.be.at.most(1);
+      }
+    });
+  });
+
+  test("moon_phase is in 0-1 range", function() {
+    const data = res.getBody();
+    const mp = data.today.moon_phase;
+    expect(mp).to.be.at.least(0);
+    expect(mp).to.be.at.most(1);
+  });
+}

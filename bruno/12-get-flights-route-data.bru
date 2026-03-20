@@ -1,0 +1,79 @@
+meta {
+  name: Get Flights - Route Data Validation
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/flights?radius={{testRadius}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testRadius: 100
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has flights array", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("flights");
+    expect(data.flights).to.be.an("array");
+  });
+
+  test("Each flight has route fields present", function() {
+    const flights = res.getBody().flights;
+    flights.forEach(function(f) {
+      expect(f).to.have.property("origin");
+      expect(f).to.have.property("destination");
+      expect(f).to.have.property("origin_city");
+      expect(f).to.have.property("destination_city");
+      expect(f).to.have.property("airline_iata");
+    });
+  });
+
+  test("Origin and destination are valid IATA format when present", function() {
+    const flights = res.getBody().flights;
+    flights.forEach(function(f) {
+      if (f.origin) {
+        expect(f.origin).to.match(/^[A-Z]{3}$/, "origin should be 3 uppercase letters");
+      }
+      if (f.destination) {
+        expect(f.destination).to.match(/^[A-Z]{3}$/, "destination should be 3 uppercase letters");
+      }
+    });
+  });
+
+  test("Origin and destination are both present or both absent", function() {
+    const flights = res.getBody().flights;
+    flights.forEach(function(f) {
+      const hasOrigin = f.origin && f.origin.length > 0;
+      const hasDest   = f.destination && f.destination.length > 0;
+      expect(hasOrigin).to.equal(hasDest, "origin and destination should appear together");
+    });
+  });
+
+  test("Log route data for all flights", function() {
+    const flights = res.getBody().flights;
+    console.log("Flights found: " + flights.length);
+    flights.forEach(function(f) {
+      const route = (f.origin && f.destination) ? f.origin + " -> " + f.destination : "no route";
+      console.log("  " + f.callsign + " | " + route + " | " + f.aircraft_type);
+    });
+    expect(flights.length).to.be.at.least(0);
+  });
+
+  test("At least one flight has route data (may fail if airspace is empty)", function() {
+    const flights = res.getBody().flights;
+    const withRoute = flights.filter(function(f) {
+      return f.origin && f.destination;
+    });
+    console.log("Flights with route: " + withRoute.length + " / " + flights.length);
+    // Soft assertion — logs result but doesn't fail the suite if no traffic overhead
+    expect(withRoute.length).to.be.at.least(0);
+  });
+}

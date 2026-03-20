@@ -1,0 +1,73 @@
+meta {
+  name: AirLabs Flight API (Raw)
+  type: http
+  seq: 14
+}
+
+get {
+  url: https://airlabs.co/api/v9/flight?flight_icao={{testFlightIcao}}&api_key={{airlabsApiKey}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testFlightIcao: AAL1
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has no error field", function() {
+    const body = res.getBody();
+    expect(body).to.not.have.property("error");
+  });
+
+  test("Response has a response object", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("response");
+    expect(body.response).to.be.an("object");
+  });
+
+  test("Flight has dep_iata and arr_iata", function() {
+    const f = res.getBody().response;
+    expect(f).to.have.property("dep_iata");
+    expect(f).to.have.property("arr_iata");
+    expect(f.dep_iata).to.match(/^[A-Z]{3}$/, "dep_iata should be 3 uppercase letters");
+    expect(f.arr_iata).to.match(/^[A-Z]{3}$/, "arr_iata should be 3 uppercase letters");
+  });
+
+  test("Flight has airline_iata", function() {
+    const f = res.getBody().response;
+    expect(f).to.have.property("airline_iata");
+    expect(f.airline_iata.length).to.be.at.least(2);
+  });
+
+  test("Flight has status field", function() {
+    const f = res.getBody().response;
+    expect(f).to.have.property("status");
+    expect(["scheduled", "en-route", "landed"]).to.include(f.status);
+  });
+
+  test("Log full flight details", function() {
+    const f = res.getBody().response;
+    console.log("Flight:     " + (f.flight_icao || "") + " / " + (f.flight_iata || ""));
+    console.log("Route:      " + (f.dep_iata || "?") + " -> " + (f.arr_iata || "?"));
+    console.log("Airline:    " + (f.airline_iata || "?") + " / " + (f.airline_icao || "?"));
+    console.log("Status:     " + (f.status || "?"));
+    console.log("Dep time:   " + (f.dep_time || "?") + " (est: " + (f.dep_estimated || "none") + ")");
+    console.log("Arr time:   " + (f.arr_time || "?") + " (est: " + (f.arr_estimated || "none") + ")");
+    console.log("Dep delay:  " + (f.dep_delayed != null ? f.dep_delayed + " min" : "none"));
+    console.log("Arr delay:  " + (f.arr_delayed != null ? f.arr_delayed + " min" : "none"));
+    console.log("Duration:   " + (f.duration != null ? f.duration + " min" : "?"));
+    console.log("Aircraft:   " + (f.aircraft_icao || "?") + " / " + (f.model || "?"));
+    console.log("Reg:        " + (f.reg_number || "?") + " (" + (f.flag || "?") + ")");
+    console.log("Position:   lat=" + f.lat + " lng=" + f.lng + " alt=" + f.alt + "m");
+    console.log("Speed:      " + f.speed + " km/h  vspeed=" + f.v_speed);
+    if (f.cs_flight_iata) {
+      console.log("Codeshare:  " + f.cs_airline_iata + " " + f.cs_flight_iata);
+    }
+    expect(true).to.equal(true);
+  });
+}

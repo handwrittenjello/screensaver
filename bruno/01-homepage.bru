@@ -1,0 +1,21 @@
+meta {
+  name: Homepage
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is HTML", function() {
+    expect(res.getHeader("content-type")).to.include("text/html");
+  });
+}

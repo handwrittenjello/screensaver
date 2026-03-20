@@ -1,0 +1,48 @@
+meta {
+  name: OpenWeather Raw API (Debug)
+  type: http
+  seq: 7
+}
+
+get {
+  url: https://api.openweathermap.org/data/3.0/onecall?lat={{lat}}&lon={{lon}}&appid={{owmApiKey}}&units={{units}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("OWM API returns 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has expected top-level sections", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("current");
+    expect(data).to.have.property("daily");
+    expect(data).to.have.property("hourly");
+    expect(data).to.have.property("minutely");
+  });
+
+  test("daily has 8 entries", function() {
+    const data = res.getBody();
+    expect(data.daily.length).to.equal(8);
+  });
+
+  test("daily[0] has rain/snow fields or they are absent (not null)", function() {
+    const data = res.getBody();
+    const today = data.daily[0];
+    // rain and snow are absent when 0, not null — this verifies pop is valid
+    expect(today.pop).to.be.a("number");
+    expect(today.pop).to.be.at.least(0);
+    expect(today.pop).to.be.at.most(1);
+  });
+
+  test("current has all expected astro fields", function() {
+    const data = res.getBody();
+    const c = data.current;
+    expect(c).to.have.property("clouds");
+    expect(c).to.have.property("visibility");
+    expect(c).to.have.property("dew_point");
+    expect(c).to.have.property("wind_speed");
+  });
+}

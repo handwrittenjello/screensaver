@@ -1,0 +1,52 @@
+meta {
+  name: Planespotters Photo API (Debug)
+  type: http
+  seq: 10
+}
+
+get {
+  url: https://api.planespotters.net/pub/photos/reg/{{testReg}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testReg: N206BZ
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has photos array", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("photos");
+    expect(data.photos).to.be.an("array");
+  });
+
+  test("Photos array is non-empty for known aircraft", function() {
+    const photos = res.getBody().photos;
+    expect(photos.length).to.be.greaterThan(0);
+  });
+
+  test("First photo has thumbnail_large with src URL", function() {
+    const photo = res.getBody().photos[0];
+    expect(photo).to.have.property("thumbnail_large");
+    expect(photo.thumbnail_large).to.have.property("src");
+    expect(photo.thumbnail_large.src).to.be.a("string");
+    expect(photo.thumbnail_large.src).to.match(/^https:\/\//);
+  });
+
+  test("thumbnail_large has expected dimensions (420x280)", function() {
+    const size = res.getBody().photos[0].thumbnail_large.size;
+    expect(size.width).to.equal(420);
+    expect(size.height).to.equal(280);
+  });
+
+  test("First photo has link back to planespotters.net", function() {
+    const photo = res.getBody().photos[0];
+    expect(photo).to.have.property("link");
+    expect(photo.link).to.include("planespotters.net");
+  });
+}

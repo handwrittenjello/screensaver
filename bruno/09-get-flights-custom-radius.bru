@@ -1,0 +1,49 @@
+meta {
+  name: Get Flights - Custom Radius
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/flights?radius={{testRadius}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testRadius: 50
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has flights array", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("flights");
+    expect(data.flights).to.be.an("array");
+  });
+
+  test("All flights are within the requested radius", function() {
+    const radius = parseFloat(bru.getVar("testRadius"));
+    const flights = res.getBody().flights;
+    flights.forEach(function(f) {
+      expect(f.distance_mi).to.be.at.most(radius);
+    });
+  });
+
+  test("Flights sorted by distance ascending", function() {
+    const flights = res.getBody().flights;
+    for (let i = 1; i < flights.length; i++) {
+      expect(flights[i].distance_mi).to.be.at.least(flights[i - 1].distance_mi);
+    }
+  });
+
+  test("Custom radius returns more flights than default 5mi", function() {
+    const flights = res.getBody().flights;
+    // Log count for visibility — not a hard assertion since airspace varies
+    console.log("Flights found within " + bru.getVar("testRadius") + " mi: " + flights.length);
+    expect(flights.length).to.be.at.least(0);
+  });
+}

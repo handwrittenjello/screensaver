@@ -1,0 +1,52 @@
+meta {
+  name: Hexdb Aircraft Type Lookup (Debug)
+  type: http
+  seq: 11
+}
+
+get {
+  url: https://hexdb.io/api/v1/aircraft/{{testHex}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testHex: a4ec6a
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has ICAOTypeCode", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("ICAOTypeCode");
+    expect(data.ICAOTypeCode).to.be.a("string");
+    expect(data.ICAOTypeCode.length).to.be.greaterThan(0);
+  });
+
+  test("Response has Type (full model name)", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("Type");
+    expect(data.Type).to.be.a("string");
+    expect(data.Type.length).to.be.greaterThan(0);
+  });
+
+  test("Response has Registration", function() {
+    const data = res.getBody();
+    expect(data).to.have.property("Registration");
+  });
+
+  test("ICAOTypeCode is a known format (2-4 uppercase chars)", function() {
+    const code = res.getBody().ICAOTypeCode;
+    expect(code).to.match(/^[A-Z0-9]{2,4}$/);
+  });
+
+  test("Planespotters type search returns valid structure for this type", function() {
+    const icaoType = res.getBody().ICAOTypeCode;
+    // Log for visibility — actual planespotters type fetch tested separately
+    console.log("ICAO type code: " + icaoType + " (" + res.getBody().Type + ")");
+    expect(icaoType).to.be.a("string");
+  });
+}

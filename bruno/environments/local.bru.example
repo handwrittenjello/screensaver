@@ -1,0 +1,10 @@
+vars {
+  baseUrl: http://localhost:5050
+  owmApiKey: YOUR_OWM_API_KEY_HERE
+  lat: 32.8674
+  lon: -79.8049
+  units: imperial
+  openskyClientId: YOUR_OPENSKY_CLIENT_ID_HERE
+  openskyClientSecret: YOUR_OPENSKY_CLIENT_SECRET_HERE
+  airlabsApiKey: YOUR_AIRLABS_API_KEY_HERE
+}
