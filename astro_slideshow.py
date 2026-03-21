@@ -595,5 +595,50 @@ def upload_image():
     else:
         return "File type not allowed", 400
 
+def _query_routes(where_clause, params):
+    """Run a SELECT against route_cache and return list of dicts."""
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            f"SELECT * FROM route_cache WHERE {where_clause} ORDER BY last_updated DESC",
+            params,
+        ).fetchall()
+        con.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.route('/api/routes/callsign/<path:callsign>')
+def api_routes_callsign(callsign):
+    rows = _query_routes("callsign = ?", (callsign.strip().upper(),))
+    return jsonify(rows)
+
+
+@app.route('/api/routes/origin/<origin>')
+def api_routes_origin(origin):
+    rows = _query_routes("origin = ?", (origin.strip().upper(),))
+    return jsonify(rows)
+
+
+@app.route('/api/routes/destination/<destination>')
+def api_routes_destination(destination):
+    rows = _query_routes("destination = ?", (destination.strip().upper(),))
+    return jsonify(rows)
+
+
+@app.route('/api/routes/airline/<airline_iata>')
+def api_routes_airline(airline_iata):
+    rows = _query_routes("airline_iata = ?", (airline_iata.strip().upper(),))
+    return jsonify(rows)
+
+
+@app.route('/api/routes/model/<path:model>')
+def api_routes_model(model):
+    rows = _query_routes("model LIKE ?", (f"%{model.strip()}%",))
+    return jsonify(rows)
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)
