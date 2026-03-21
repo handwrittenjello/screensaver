@@ -294,6 +294,18 @@
       margin-bottom: 0;
     }
 
+    .flight-section-header {
+      font-size: 10px;
+      color: #666;
+      letter-spacing: 0.08em;
+      margin: 4px 0 2px;
+    }
+
+    .flight-section-divider {
+      border-color: #333;
+      margin: 6px 0 4px;
+    }
+
     .flight-photo {
       width: 80px;
       height: 52px;
@@ -479,6 +491,10 @@
     let timeFormat = "12h-HH:MM";
     // Flight search radius (miles)
     let flightRadius = 7;
+    let recentFlights = [];
+    let lastFlightData = [];
+    const MAX_FLIGHTS_DISPLAY = 5;
+    const MAX_RECENT_STORE = 10;
     // Weather update interval (15 minutes)
     const weatherUpdateInterval = 900000;
     // Pointer idle timer
@@ -796,6 +812,40 @@
                     'S','SSW','SW','WSW','W','WNW','NW','NNW'];
       return dirs[Math.round(deg / 22.5) % 16];
     }
+    function flightCardHtml(f, isRecent) {
+      const fmtAirport = (city, code) => city ? `${city} (${code})` : code;
+      const route = (f.origin && f.destination)
+        ? `${fmtAirport(f.origin_city, f.origin)} → ${fmtAirport(f.destination_city, f.destination)}`
+        : '';
+      const alt   = f.altitude_ft != null ? f.altitude_ft.toLocaleString() + ' ft' : '';
+      const spd   = f.speed_mph   != null ? f.speed_mph + ' mph' : '';
+      const stats = [alt, spd, f.distance_mi != null ? f.distance_mi + ' mi' : '', degreesToCompass(f.heading_deg)]
+                      .filter(Boolean).join('  ');
+      const logoHtml = f.airline_iata
+        ? `<img class="flight-airline-logo"
+               src="https://www.gstatic.com/flights/airline_logos/70px/${f.airline_iata}.png"
+               onerror="this.style.display='none'">`
+        : '';
+      const photoHtml = f.photo_url
+        ? `<img class="flight-photo" src="${f.photo_url}" onerror="this.style.display='none'">`
+        : '';
+      const typeHtml = f.aircraft_type
+        ? `<div style="font-size:11px;color:#888;margin-top:1px;">${f.aircraft_type}</div>`
+        : '';
+      const opacity = isRecent ? ' style="opacity:0.55"' : '';
+      return `
+        <div class="flight-card"${opacity}>
+          ${photoHtml}
+          <div class="flight-info">
+            <div style="display:flex;align-items:baseline;margin:3px 0;">
+              <span class="flight-callsign">${logoHtml}${f.callsign}</span>
+              <span class="flight-route">${route}</span>
+            </div>
+            <div style="font-size:12px;color:#aaa;">${stats}</div>
+            ${typeHtml}
+          </div>
+        </div>`;
+    }
     function renderFlights(data) {
       const el = document.getElementById('flights-module');
       if (!data || data.error) {
@@ -803,51 +853,43 @@
           <div style="font-size:13px;color:#aaa;padding:4px 0;">Flight data offline</div>`;
         return;
       }
-      const flights = data.flights || [];
+      const current = (data.flights || []).slice(0, MAX_FLIGHTS_DISPLAY);
+      const recentSlots = MAX_FLIGHTS_DISPLAY - current.length;
+      const recent = recentFlights.slice(0, recentSlots);
       let html = `<div class="weather-header">Planes Overhead</div><hr>`;
-      if (flights.length === 0) {
+      if (current.length === 0 && recent.length === 0) {
         html += `<div style="font-size:13px;color:#aaa;padding:4px 0;">No flights within ${flightRadius} mi</div>`;
       } else {
-        const fmtAirport = (city, code) => city ? `${city} (${code})` : code;
-        flights.forEach(f => {
-          const route = (f.origin && f.destination)
-            ? `${fmtAirport(f.origin_city, f.origin)} → ${fmtAirport(f.destination_city, f.destination)}`
-            : '';
-          const alt   = f.altitude_ft != null ? f.altitude_ft.toLocaleString() + ' ft' : '';
-          const spd   = f.speed_mph   != null ? f.speed_mph + ' mph' : '';
-          const stats = [alt, spd, f.distance_mi + ' mi', degreesToCompass(f.heading_deg)]
-                          .filter(Boolean).join('  ');
-          const logoHtml = f.airline_iata
-            ? `<img class="flight-airline-logo"
-                   src="https://www.gstatic.com/flights/airline_logos/70px/${f.airline_iata}.png"
-                   onerror="this.style.display='none'">`
-            : '';
-          const photoHtml = f.photo_url
-            ? `<img class="flight-photo" src="${f.photo_url}" onerror="this.style.display='none'">`
-            : '';
-          const typeHtml = f.aircraft_type
-            ? `<div style="font-size:11px;color:#888;margin-top:1px;">${f.aircraft_type}</div>`
-            : '';
-          html += `
-            <div class="flight-card">
-              ${photoHtml}
-              <div class="flight-info">
-                <div style="display:flex;align-items:baseline;margin:3px 0;">
-                  <span class="flight-callsign">${logoHtml}${f.callsign}</span>
-                  <span class="flight-route">${route}</span>
-                </div>
-                <div style="font-size:12px;color:#aaa;">${stats}</div>
-                ${typeHtml}
-              </div>
-            </div>`;
-        });
+        if (current.length > 0) {
+          html += `<div class="flight-section-header">IN RANGE</div>`;
+          current.forEach(f => { html += flightCardHtml(f, false); });
+        }
+        if (recent.length > 0) {
+          html += `<hr class="flight-section-divider"><div class="flight-section-header">RECENT</div>`;
+          recent.forEach(f => { html += flightCardHtml(f, true); });
+        }
       }
       el.innerHTML = html;
     }
     function updateFlights() {
       fetch(`/flights?radius=${flightRadius}`)
         .then(r => r.json())
-        .then(data => renderFlights(data))
+        .then(data => {
+          const newFlights = (data && data.flights) ? data.flights : [];
+          const newCallsigns = new Set(newFlights.map(f => f.callsign));
+          lastFlightData.forEach(f => {
+            if (!newCallsigns.has(f.callsign)) {
+              recentFlights = recentFlights.filter(r => r.callsign !== f.callsign);
+              recentFlights.unshift({ ...f, _seenAt: Date.now() });
+              if (recentFlights.length > MAX_RECENT_STORE) {
+                recentFlights = recentFlights.slice(0, MAX_RECENT_STORE);
+              }
+            }
+          });
+          recentFlights = recentFlights.filter(r => !newCallsigns.has(r.callsign));
+          lastFlightData = newFlights;
+          renderFlights(data);
+        })
         .catch(() => renderFlights(null));
     }
     updateFlights();
