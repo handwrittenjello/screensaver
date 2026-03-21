@@ -235,6 +235,13 @@ def _get_route(icao24, callsign):
     if not cache_key:
         return {}
     cs = cache_key.strip().upper()
+
+    # Skip route lookup for N-number registrations (US private/GA aircraft).
+    # N-numbers always have a digit as the second character (e.g. N6843Q, N12345).
+    # Airline ICAO callsigns always have a letter as the second character (e.g. AAL123).
+    if len(cs) >= 2 and cs[0] == 'N' and cs[1].isdigit():
+        return {}
+
     now = int(time.time())
 
     # Check DB cache
