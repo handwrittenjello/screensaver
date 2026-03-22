@@ -43,13 +43,28 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
+import json
+
 SCRIPT_DIR       = os.path.dirname(os.path.abspath(__file__))
 DB_PATH          = os.path.join(SCRIPT_DIR, "data", "routes.db")
 OUTPUT_DIR       = os.path.join(SCRIPT_DIR, "static", "aircraft_types")
+OVERRIDES_PATH   = os.path.join(SCRIPT_DIR, "config", "aircraft_photo_overrides.json")
 THUMB_MAX_WIDTH  = 800
 THUMB_MAX_HEIGHT = 600
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def load_overrides():
+    """Load model search/path overrides from config file."""
+    try:
+        with open(OVERRIDES_PATH) as f:
+            data = json.load(f)
+        return {k: v for k, v in data.items() if not k.startswith("_comment")}
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"WARNING: could not load overrides: {e}")
+        return {}
 
 WIKIPEDIA_HEADERS = {
     "User-Agent": "screensaver-aircraft-photo-fetcher/1.0 (educational project)"
@@ -215,6 +230,7 @@ def main():
     )
     args = parser.parse_args()
 
+    overrides = load_overrides()
     models = get_missing_models()
     if not models:
         print("No missing aircraft photos found in the database.")
@@ -227,12 +243,33 @@ def main():
 
     for model in models:
         if args.dry_run:
-            print(f"  [dry-run] {model}")
+            override = overrides.get(model, {})
+            hint = f"  [override: {override}]" if override else ""
+            print(f"  [dry-run] {model}{hint}")
             continue
+
+        # Check overrides first
+        override = overrides.get(model, {})
+
+        # local_path override — reuse an existing image, no download needed
+        if override.get("local_path"):
+            local_path = override["local_path"]
+            full = os.path.join(SCRIPT_DIR, local_path.lstrip("/"))
+            if os.path.exists(full):
+                update_db(model, local_path, "", "override")
+                print(f"  + {model}  ->  {os.path.basename(local_path)}  (override → existing image)")
+                found += 1
+            else:
+                print(f"  x {model}  (override local_path not found: {local_path})")
+                not_found += 1
+            continue
+
+        # search override — use alternate query instead of model name
+        search_query = override.get("search", model)
 
         # Step 1a: Wikipedia — single URL from article thumbnail
         candidates = []  # list of (url, source_label)
-        title = wikipedia_search_title(model)
+        title = wikipedia_search_title(search_query)
         if title:
             wiki_url = wikipedia_page_image_url(title)
             if wiki_url:
@@ -240,7 +277,7 @@ def main():
 
         # Step 1b: DuckDuckGo fallback — up to 5 candidate URLs
         if not candidates:
-            for url in duckduckgo_image_urls(model):
+            for url in duckduckgo_image_urls(search_query):
                 candidates.append((url, "DuckDuckGo"))
 
         if not candidates:
