@@ -383,6 +383,7 @@ def _get_route(icao24, callsign):
         ).fetchone()
         con.close()
         if row and (now - row["last_updated"]) < ROUTE_CACHE_TTL:
+            print(f"[route] {cs}: cache hit origin={row['origin']!r} dest={row['destination']!r}", flush=True)
             return {
                 "origin":       row["origin"] or "",
                 "destination":  row["destination"] or "",
@@ -396,12 +397,14 @@ def _get_route(icao24, callsign):
     # Primary: AeroDataBox via RapidAPI — try for ALL callsigns including N-numbers
     if callsign and config_data.get("AERODATABOX_RAPIDAPI_KEY", ""):
         data = _get_route_from_aerodatabox(callsign)
+        print(f"[route] {cs}: aerodatabox -> origin={data.get('origin')!r} dest={data.get('destination')!r}", flush=True)
 
     # Secondary + fallback: skip for N-numbers (AirLabs/adsbdb have no private plane data)
     if not data.get("origin") and not is_n_number:
         # AirLabs
         if callsign:
             data = _get_route_from_airlabs(callsign)
+            print(f"[route] {cs}: airlabs -> origin={data.get('origin')!r} dest={data.get('destination')!r}", flush=True)
 
     # adsbdb fallback (also skipped for N-numbers)
     if not data.get("origin") and not is_n_number and callsign and callsign.strip():
@@ -415,6 +418,7 @@ def _get_route(icao24, callsign):
                     "airline_iata": fr.get("airline", {}).get("iata", ""),
                 }
                 # Persist adsbdb result so we don't re-fetch within TTL
+                print(f"[route] {cs}: adsbdb -> origin={data.get('origin')!r} dest={data.get('destination')!r}", flush=True)
                 if data.get("origin"):
                     try:
                         con = sqlite3.connect(_DB_PATH)
