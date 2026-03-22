@@ -146,15 +146,17 @@ def safe_filename(model):
 def download_and_save(image_url, dest_path):
     """
     Download image_url, optionally resize with Pillow, save to dest_path.
-    Returns True on success.
+    Returns True on success, prints reason on failure.
     """
     try:
         r = requests.get(image_url, timeout=8, stream=True,
                          headers=WIKIPEDIA_HEADERS)
         if r.status_code != 200:
+            print(f"    download failed: HTTP {r.status_code} for {image_url}")
             return False
         content_type = r.headers.get("Content-Type", "")
         if "image" not in content_type:
+            print(f"    download failed: unexpected Content-Type '{content_type}' for {image_url}")
             return False
 
         raw = b"".join(r.iter_content(8192))
@@ -261,7 +263,7 @@ def main():
             print(f"  + {model}  ->  {filename}  ({label})")
             found += 1
         else:
-            print(f"  x {model}  (download failed)")
+            print(f"  x {model}  (download failed: {image_url})")
             not_found += 1
 
         time.sleep(0.5)
