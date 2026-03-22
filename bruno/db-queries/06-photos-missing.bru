@@ -1,0 +1,40 @@
+meta {
+  name: Photos DB - Missing Images
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/photos/missing
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("Every row has key and source fields", function() {
+    const rows = res.getBody();
+    rows.forEach(function(r) {
+      expect(r).to.have.property("key");
+      expect(r).to.have.property("source");
+      expect(r).to.have.property("last_updated");
+    });
+  });
+
+  test("Log missing photos summary", function() {
+    const rows = res.getBody();
+    console.log("Aircraft models with no photo: " + rows.length);
+    rows.forEach(function(r) {
+      const age = Math.round((Date.now() / 1000 - r.last_updated) / 86400);
+      console.log("  [" + (r.source || "?") + "] " + r.key + "  (checked " + age + " days ago)");
+    });
+    expect(rows.length).to.be.at.least(0);
+  });
+}

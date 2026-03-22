@@ -1,7 +1,7 @@
 meta {
   name: Get Flights - Route Data Validation
   type: http
-  seq: 12
+  seq: 9
 }
 
 get {
@@ -73,7 +73,6 @@ tests {
       return f.origin && f.destination;
     });
     console.log("Flights with route: " + withRoute.length + " / " + flights.length);
-    // Soft assertion — logs result but doesn't fail the suite if no traffic overhead
     expect(withRoute.length).to.be.at.least(0);
   });
 }

@@ -1,0 +1,58 @@
+meta {
+  name: Routes DB - By Callsign
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/routes/callsign/{{testCallsign}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testCallsign: AAL1
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("Returns 0 or 1 result (callsign is primary key)", function() {
+    expect(res.getBody().length).to.be.at.most(1);
+  });
+
+  test("Log result", function() {
+    const rows = res.getBody();
+    if (rows.length === 0) {
+      console.log("No cached route for callsign: " + bru.getVar("testCallsign"));
+    } else {
+      const r = rows[0];
+      console.log("Callsign:     " + r.callsign);
+      console.log("Route:        " + (r.origin || "?") + " -> " + (r.destination || "?"));
+      console.log("Airline IATA: " + (r.airline_iata || "?"));
+      console.log("Model:        " + (r.model || "?"));
+      console.log("Status:       " + (r.status || "?"));
+      console.log("Last updated: " + new Date(r.last_updated * 1000).toISOString());
+    }
+    expect(true).to.equal(true);
+  });
+
+  test("Row has expected fields when result found", function() {
+    const rows = res.getBody();
+    if (rows.length > 0) {
+      const r = rows[0];
+      expect(r).to.have.property("callsign");
+      expect(r).to.have.property("origin");
+      expect(r).to.have.property("destination");
+      expect(r).to.have.property("airline_iata");
+      expect(r).to.have.property("last_updated");
+    }
+    expect(true).to.equal(true);
+  });
+}

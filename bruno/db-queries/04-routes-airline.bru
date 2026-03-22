@@ -1,0 +1,48 @@
+meta {
+  name: Routes DB - By Airline IATA
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/routes/airline/{{testAirlineIata}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  testAirlineIata: AA
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("Every row has matching airline_iata", function() {
+    const rows = res.getBody();
+    rows.forEach(function(r) {
+      expect(r.airline_iata).to.equal(bru.getVar("testAirlineIata").toUpperCase());
+    });
+  });
+
+  test("Rows are sorted newest first", function() {
+    const rows = res.getBody();
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1].last_updated).to.be.at.least(rows[i].last_updated);
+    }
+  });
+
+  test("Log results", function() {
+    const rows = res.getBody();
+    console.log("Flights for airline " + bru.getVar("testAirlineIata") + ": " + rows.length);
+    rows.forEach(function(r) {
+      console.log("  " + r.callsign + " | " + (r.origin || "?") + " -> " + (r.destination || "?") + " | " + (r.model || "?"));
+    });
+    expect(rows.length).to.be.at.least(0);
+  });
+}

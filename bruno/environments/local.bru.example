@@ -7,4 +7,6 @@ vars {
   openskyClientId: YOUR_OPENSKY_CLIENT_ID_HERE
   openskyClientSecret: YOUR_OPENSKY_CLIENT_SECRET_HERE
   airlabsApiKey: YOUR_AIRLABS_API_KEY_HERE
+  aerodataboxApiKey: YOUR_AERODATABOX_RAPIDAPI_KEY_HERE
+
 }

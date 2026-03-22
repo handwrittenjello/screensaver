@@ -24,8 +24,10 @@ if os.path.exists(_airports_path):
     with open(_airports_path, encoding="utf-8") as _f:
         _airports = json.load(_f)
 
-_AIRCRAFT_TYPES_DIR = os.path.join(os.getcwd(), "static", "aircraft_types")
-os.makedirs(_AIRCRAFT_TYPES_DIR, exist_ok=True)
+_AIRCRAFT_TYPES_DIR  = os.path.join(os.getcwd(), "static", "aircraft_types")
+_AIRCRAFT_PHOTOS_DIR = os.path.join(os.getcwd(), "static", "aircraft_photos")
+os.makedirs(_AIRCRAFT_TYPES_DIR,  exist_ok=True)
+os.makedirs(_AIRCRAFT_PHOTOS_DIR, exist_ok=True)
 
 _DB_PATH = os.path.join(os.getcwd(), "data", "routes.db")
 
@@ -91,6 +93,33 @@ def _init_db():
             age               INTEGER
         )
     """)
+    con.commit()
+
+    # Migrate: add columns introduced after initial schema
+    for col_def in [
+        "data_source TEXT",
+        "dep_municipality TEXT",
+        "arr_municipality TEXT",
+        "dep_country TEXT",
+        "arr_country TEXT",
+        "is_cargo INTEGER",
+    ]:
+        try:
+            con.execute(f"ALTER TABLE route_cache ADD COLUMN {col_def}")
+        except Exception:
+            pass  # column already exists
+
+    # Second table: persistent aircraft photo cache keyed by model string
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS aircraft_photo_cache (
+            key          TEXT PRIMARY KEY,
+            local_path   TEXT,
+            source_url   TEXT,
+            source       TEXT,
+            last_updated INTEGER
+        )
+    """)
+
     con.commit()
     con.close()
 
@@ -180,6 +209,101 @@ def _get_route_from_airlabs(callsign):
         return {}
 
 
+def _get_route_from_aerodatabox(callsign):
+    """
+    Fetch scheduled flight data from AeroDataBox via RapidAPI (Tier 2 endpoint).
+    Persists all available fields to route_cache DB.
+    Returns {'origin', 'destination', 'airline_iata'} or {} on failure.
+    """
+    api_key = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
+    if not api_key or not callsign:
+        return {}
+    cs = callsign.strip().upper()
+    try:
+        r = requests.get(
+            f"https://aerodatabox.p.rapidapi.com/flights/callsign/{cs}",
+            headers={
+                "x-rapidapi-key":  api_key,
+                "x-rapidapi-host": "aerodatabox.p.rapidapi.com",
+            },
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return {}
+        flights = r.json()
+        if not flights or not isinstance(flights, list):
+            return {}
+        f        = flights[0]
+        dep      = f.get("departure", {})
+        arr      = f.get("arrival",   {})
+        dep_apt  = dep.get("airport", {})
+        arr_apt  = arr.get("airport", {})
+        airline  = f.get("airline",   {})
+        aircraft = f.get("aircraft",  {})
+        dep_sched = dep.get("scheduledTime", {})
+        arr_sched = arr.get("scheduledTime", {})
+        dep_rev   = dep.get("revisedTime",   {}) or {}
+        arr_rev   = arr.get("revisedTime",   {}) or {}
+
+        now = int(time.time())
+        con = sqlite3.connect(_DB_PATH)
+        con.execute("""
+            INSERT OR REPLACE INTO route_cache (
+                callsign, last_updated, data_source,
+                origin, destination, airline_iata, airline_icao,
+                dep_icao, arr_icao,
+                dep_municipality, arr_municipality,
+                dep_country, arr_country,
+                dep_terminal, arr_terminal,
+                dep_gate, arr_gate, arr_baggage,
+                dep_time_utc, arr_time_utc,
+                dep_time, arr_time,
+                dep_estimated_utc, arr_estimated_utc,
+                status, flight_number,
+                reg_number, model, hex, is_cargo
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            cs, now, "aerodatabox",
+            dep_apt.get("iata",             ""),
+            arr_apt.get("iata",             ""),
+            airline.get("iata",             ""),
+            airline.get("icao",             ""),
+            dep_apt.get("icao",             ""),
+            arr_apt.get("icao",             ""),
+            dep_apt.get("municipalityName", ""),
+            arr_apt.get("municipalityName", ""),
+            dep_apt.get("countryCode",      ""),
+            arr_apt.get("countryCode",      ""),
+            dep.get("terminal",    ""),
+            arr.get("terminal",    ""),
+            dep.get("gate",        ""),
+            arr.get("gate",        ""),
+            arr.get("baggageBelt", ""),
+            dep_sched.get("utc",   ""),
+            arr_sched.get("utc",   ""),
+            dep_sched.get("local", ""),
+            arr_sched.get("local", ""),
+            dep_rev.get("utc",     ""),
+            arr_rev.get("utc",     ""),
+            f.get("status",        ""),
+            f.get("number",        ""),
+            aircraft.get("reg",    ""),
+            aircraft.get("model",  ""),
+            aircraft.get("modeS",  ""),
+            1 if f.get("isCargo") else 0,
+        ))
+        con.commit()
+        con.close()
+
+        return {
+            "origin":       dep_apt.get("iata", ""),
+            "destination":  arr_apt.get("iata", ""),
+            "airline_iata": airline.get("iata",  ""),
+        }
+    except Exception:
+        return {}
+
+
 def haversine_miles(lat1, lon1, lat2, lon2):
     R = 3958.8
     d_lat = radians(lat2 - lat1)
@@ -228,19 +352,18 @@ ROUTE_CACHE_TTL = 7 * 86400  # 7 days
 def _get_route(icao24, callsign):
     """
     Return route dict with origin/destination IATA codes and airline_iata.
-    Checks SQLite DB first (7-day TTL). Primary live source: AirLabs.co.
-    Fallback: adsbdb.com (static historical).
+    Checks SQLite DB first (7-day TTL). Priority: AeroDataBox → AirLabs → adsbdb.
+    N-number callsigns (US private aircraft) are tried via AeroDataBox only;
+    AirLabs and adsbdb are skipped for them as those sources have no private plane data.
     """
     cache_key = callsign or icao24
     if not cache_key:
         return {}
     cs = cache_key.strip().upper()
 
-    # Skip route lookup for N-number registrations (US private/GA aircraft).
-    # N-numbers always have a digit as the second character (e.g. N6843Q, N12345).
-    # Airline ICAO callsigns always have a letter as the second character (e.g. AAL123).
-    if len(cs) >= 2 and cs[0] == 'N' and cs[1].isdigit():
-        return {}
+    # Detect N-number registrations used as callsigns (e.g. N6843Q, N367QS).
+    # AeroDataBox may have IFR flight plan data; AirLabs/adsbdb never do.
+    is_n_number = len(cs) >= 2 and cs[0] == 'N' and cs[1].isdigit()
 
     now = int(time.time())
 
@@ -264,12 +387,18 @@ def _get_route(icao24, callsign):
 
     data = {}
 
-    # Primary: AirLabs scheduled data (writes to DB on success)
-    if callsign:
-        data = _get_route_from_airlabs(callsign)
+    # Primary: AeroDataBox via RapidAPI — try for ALL callsigns including N-numbers
+    if callsign and config_data.get("AERODATABOX_RAPIDAPI_KEY", ""):
+        data = _get_route_from_aerodatabox(callsign)
 
-    # Fallback: adsbdb static database
-    if not data.get("origin") and callsign and callsign.strip():
+    # Secondary + fallback: skip for N-numbers (AirLabs/adsbdb have no private plane data)
+    if not data.get("origin") and not is_n_number:
+        # AirLabs
+        if callsign:
+            data = _get_route_from_airlabs(callsign)
+
+    # adsbdb fallback (also skipped for N-numbers)
+    if not data.get("origin") and not is_n_number and callsign and callsign.strip():
         try:
             r = requests.get(f"https://api.adsbdb.com/v0/callsign/{cs}", timeout=3)
             if r.status_code == 200:
@@ -330,7 +459,8 @@ def _get_aircraft_type(icao24):
 
 # Aircraft photo cache — disk-backed, survives restarts
 _photo_cache = {}
-PHOTO_CACHE_TTL = 86400  # 24 hours
+PHOTO_CACHE_TTL = 86400       # 24 hours in-memory TTL
+PHOTO_DB_TTL    = 90 * 86400  # 90 days for DB-persisted photos
 
 def _download_image(url, dest_path):
     """Download image bytes to dest_path. Returns True on success."""
@@ -348,9 +478,12 @@ def _download_image(url, dest_path):
 def _get_photo(icao24):
     """
     Return a photo URL for an aircraft, or ''.
-    Phase 1 — specific aircraft: planespotters.net CDN URL (not stored locally).
-    Phase 2 — type fallback: hexdb.io type lookup + planespotters.net type search,
-               downloaded to disk and shared across all aircraft of that type.
+    Phase 1   — specific aircraft: planespotters.net by ICAO24 hex (CDN URL, no local storage).
+    Phase 1.5 — specific aircraft: AeroDataBox by registration; downloads image and caches in
+                aircraft_photo_cache DB keyed by model string (e.g. "Embraer Phenom 300") so all
+                aircraft of the same model share one cached photo. CC-licensed, attribution required.
+    Phase 2   — type fallback: hexdb.io type lookup + planespotters.net type search,
+                downloaded to disk; also written to aircraft_photo_cache by model key.
     """
     if not icao24:
         return ""
@@ -364,7 +497,19 @@ def _get_photo(icao24):
         _photo_cache[hex_key] = {"url": url, "ts": now}
         return url
 
-    # Phase 1: specific aircraft photo — return CDN URL directly, no local storage
+    def _db_cache_photo(model_key, local_path, source_url, source):
+        try:
+            con = sqlite3.connect(_DB_PATH)
+            con.execute(
+                "INSERT OR REPLACE INTO aircraft_photo_cache VALUES (?,?,?,?,?)",
+                (model_key, local_path, source_url, source, int(now))
+            )
+            con.commit()
+            con.close()
+        except Exception:
+            pass
+
+    # Phase 1: specific aircraft photo — Planespotters by ICAO24 hex
     try:
         r = requests.get(
             f"https://api.planespotters.net/pub/photos/hex/{hex_key}", timeout=3
@@ -376,8 +521,67 @@ def _get_photo(icao24):
     except Exception:
         pass
 
-    # Phase 2: generic type photo
-    ac_type = _get_aircraft_type(hex_key)
+    # Phase 1.5: AeroDataBox aircraft image by registration
+    # Looks up reg + model from route_cache, checks aircraft_photo_cache DB first,
+    # then calls AeroDataBox. Downloads image locally; caches by model key.
+    api_key = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
+    if api_key:
+        try:
+            con = sqlite3.connect(_DB_PATH)
+            con.row_factory = sqlite3.Row
+            row = con.execute(
+                "SELECT reg_number, model FROM route_cache WHERE hex = ? AND reg_number != '' LIMIT 1",
+                (hex_key,)
+            ).fetchone()
+            con.close()
+            reg   = row["reg_number"] if row else ""
+            model = row["model"]      if row else ""
+
+            # Check DB photo cache by model key before calling API.
+            # A row with empty local_path means we already checked and found nothing —
+            # skip the API call until the 90-day TTL expires.
+            if model:
+                con2 = sqlite3.connect(_DB_PATH)
+                con2.row_factory = sqlite3.Row
+                db_row = con2.execute(
+                    "SELECT local_path FROM aircraft_photo_cache WHERE key = ? AND last_updated > ?",
+                    (model, int(now) - PHOTO_DB_TTL)
+                ).fetchone()
+                con2.close()
+                if db_row is not None:
+                    local = db_row["local_path"] or ""
+                    if local and os.path.exists(os.path.join(os.getcwd(), local.lstrip("/"))):
+                        return _cache(local)
+                    # Row exists (with or without image) — don't re-call the API
+                    pass
+                else:
+                    # No DB record yet — call AeroDataBox and record the result either way
+                    if reg:
+                        r = requests.get(
+                            f"https://aerodatabox.p.rapidapi.com/aircrafts/reg/{reg}/image/beta",
+                            headers={
+                                "x-rapidapi-key":  api_key,
+                                "x-rapidapi-host": "aerodatabox.p.rapidapi.com",
+                            },
+                            timeout=3,
+                        )
+                        src_url = ""
+                        if r.status_code == 200:
+                            src_url = r.json().get("url", "")
+                        if src_url:
+                            safe = model.replace("/", "_").replace(" ", "_")
+                            dest = os.path.join(_AIRCRAFT_PHOTOS_DIR, f"{safe}.jpg")
+                            if _download_image(src_url, dest):
+                                local_path = f"/static/aircraft_photos/{safe}.jpg"
+                                _db_cache_photo(model, local_path, src_url, "aerodatabox")
+                                return _cache(local_path)
+                        # No image found (204, no URL, or download failed) — record the attempt
+                        _db_cache_photo(model, "", src_url, "aerodatabox")
+        except Exception:
+            pass
+
+    # Phase 2: generic type photo via hexdb.io + Planespotters
+    ac_type   = _get_aircraft_type(hex_key)
     icao_type = ac_type.get("icao_type", "")
     if not icao_type:
         return _cache("")
@@ -386,6 +590,7 @@ def _get_photo(icao24):
     if os.path.exists(local_type):
         return _cache(f"/static/aircraft_types/type_{icao_type}.jpg")
 
+    type_name = ac_type.get("type_name", "")
     try:
         r = requests.get(
             f"https://api.planespotters.net/pub/photos/type/{icao_type}", timeout=3
@@ -395,9 +600,16 @@ def _get_photo(icao24):
             if photos:
                 src = photos[0]["thumbnail_large"]["src"]
                 if _download_image(src, local_type):
-                    return _cache(f"/static/aircraft_types/type_{icao_type}.jpg")
+                    local_path = f"/static/aircraft_types/type_{icao_type}.jpg"
+                    if type_name:
+                        _db_cache_photo(type_name, local_path, src, "planespotters")
+                    return _cache(local_path)
     except Exception:
         pass
+
+    # All phases exhausted — record that we checked this model so we don't retry until TTL expires
+    if type_name:
+        _db_cache_photo(type_name, "", "", "none")
 
     return _cache("")
 
@@ -638,6 +850,38 @@ def api_routes_airline(airline_iata):
 def api_routes_model(model):
     rows = _query_routes("model LIKE ?", (f"%{model.strip()}%",))
     return jsonify(rows)
+
+
+@app.route('/api/photos/missing')
+def api_photos_missing():
+    """Return aircraft models that have been checked but have no image."""
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT key, source, last_updated FROM aircraft_photo_cache"
+            " WHERE local_path = '' ORDER BY last_updated DESC"
+        ).fetchall()
+        con.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/photos')
+def api_photos_all():
+    """Return all aircraft photo cache entries."""
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT key, local_path, source_url, source, last_updated"
+            " FROM aircraft_photo_cache ORDER BY last_updated DESC"
+        ).fetchall()
+        con.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

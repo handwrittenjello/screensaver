@@ -1,0 +1,82 @@
+meta {
+  name: AeroDataBox - Flight by Callsign
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://aerodatabox.p.rapidapi.com/flights/callsign/{{testCallsign}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-rapidapi-key: {{aerodataboxApiKey}}
+  x-rapidapi-host: aerodatabox.p.rapidapi.com
+}
+
+vars:pre-request {
+  testCallsign: AAL1
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is a non-empty array", function() {
+    const data = res.getBody();
+    expect(data).to.be.an("array");
+    expect(data.length).to.be.greaterThan(0);
+  });
+
+  test("First flight has departure airport with IATA", function() {
+    const f = res.getBody()[0];
+    expect(f).to.have.property("departure");
+    expect(f.departure).to.have.property("airport");
+    expect(f.departure.airport).to.have.property("iata");
+    expect(f.departure.airport.iata).to.be.a("string").and.have.lengthOf(3);
+  });
+
+  test("First flight has arrival airport with IATA", function() {
+    const f = res.getBody()[0];
+    expect(f).to.have.property("arrival");
+    expect(f.arrival).to.have.property("airport");
+    expect(f.arrival.airport).to.have.property("iata");
+    expect(f.arrival.airport.iata).to.be.a("string").and.have.lengthOf(3);
+  });
+
+  test("First flight has airline info", function() {
+    const f = res.getBody()[0];
+    expect(f).to.have.property("airline");
+    expect(f.airline).to.have.property("iata");
+  });
+
+  test("First flight has aircraft info", function() {
+    const f = res.getBody()[0];
+    expect(f).to.have.property("aircraft");
+    expect(f.aircraft).to.have.property("model");
+  });
+
+  test("Log full flight details", function() {
+    const flights = res.getBody();
+    console.log("Flights for callsign " + bru.getVar("testCallsign") + ": " + flights.length);
+    flights.forEach(function(f, i) {
+      const dep = (f.departure && f.departure.airport) ? f.departure.airport : {};
+      const arr = (f.arrival   && f.arrival.airport)   ? f.arrival.airport   : {};
+      const airline  = f.airline  || {};
+      const aircraft = f.aircraft || {};
+      const depSched = (f.departure && f.departure.scheduledTime) ? f.departure.scheduledTime : {};
+      const arrSched = (f.arrival   && f.arrival.scheduledTime)   ? f.arrival.scheduledTime   : {};
+      console.log("[" + (i + 1) + "] " + (f.number || "?") + " | status: " + (f.status || "?"));
+      console.log("    Route:    " + (dep.iata || "?") + " (" + (dep.municipalityName || dep.name || "?") + ") -> " + (arr.iata || "?") + " (" + (arr.municipalityName || arr.name || "?") + ")");
+      console.log("    Airline:  " + (airline.name || "?") + " [" + (airline.iata || "?") + "/" + (airline.icao || "?") + "]");
+      console.log("    Aircraft: " + (aircraft.model || "?") + " reg=" + (aircraft.reg || "?") + " modeS=" + (aircraft.modeS || "?"));
+      console.log("    Dep sched UTC: " + (depSched.utc || "?") + "  |  Arr sched UTC: " + (arrSched.utc || "?"));
+      console.log("    Dep terminal: " + (f.departure.terminal || "-") + "  gate: " + (f.departure.gate || "-"));
+      console.log("    Arr terminal: " + (f.arrival.terminal   || "-") + "  gate: " + (f.arrival.gate   || "-") + "  baggage: " + (f.arrival.baggageBelt || "-"));
+      console.log("    isCargo: " + f.isCargo);
+    });
+    expect(flights.length).to.be.greaterThan(0);
+  });
+}

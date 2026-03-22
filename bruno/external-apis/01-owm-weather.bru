@@ -1,7 +1,7 @@
 meta {
   name: OpenWeather Raw API (Debug)
   type: http
-  seq: 7
+  seq: 1
 }
 
 get {
@@ -31,7 +31,6 @@ tests {
   test("daily[0] has rain/snow fields or they are absent (not null)", function() {
     const data = res.getBody();
     const today = data.daily[0];
-    // rain and snow are absent when 0, not null — this verifies pop is valid
     expect(today.pop).to.be.a("number");
     expect(today.pop).to.be.at.least(0);
     expect(today.pop).to.be.at.most(1);

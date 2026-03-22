@@ -1,7 +1,7 @@
 meta {
   name: Hexdb Aircraft Type Lookup (Debug)
   type: http
-  seq: 11
+  seq: 3
 }
 
 get {
@@ -43,9 +43,8 @@ tests {
     expect(code).to.match(/^[A-Z0-9]{2,4}$/);
   });
 
-  test("Planespotters type search returns valid structure for this type", function() {
+  test("Log type info", function() {
     const icaoType = res.getBody().ICAOTypeCode;
-    // Log for visibility — actual planespotters type fetch tested separately
     console.log("ICAO type code: " + icaoType + " (" + res.getBody().Type + ")");
     expect(icaoType).to.be.a("string");
   });

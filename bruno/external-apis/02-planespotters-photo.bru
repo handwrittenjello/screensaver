@@ -1,7 +1,7 @@
 meta {
   name: Planespotters Photo API (Debug)
   type: http
-  seq: 10
+  seq: 2
 }
 
 get {
@@ -48,5 +48,20 @@ tests {
     const photo = res.getBody().photos[0];
     expect(photo).to.have.property("link");
     expect(photo.link).to.include("planespotters.net");
+  });
+
+  test("Log photo URLs", function() {
+    const photos = res.getBody().photos;
+    console.log("Photos for " + bru.getVar("testReg") + ": " + photos.length);
+    photos.forEach(function(p, i) {
+      const aircraft = (p.aircraft && p.aircraft.model) ? p.aircraft.model : "Unknown";
+      const airline  = (p.airline  && p.airline.name)  ? p.airline.name   : "";
+      const pg       = p.photographer;
+      const photographer = typeof pg === "string" ? pg : (pg && pg.name) ? pg.name : "";
+      console.log("[" + (i + 1) + "] " + aircraft + (airline ? " / " + airline : "") + (photographer ? " (c) " + photographer : ""));
+      console.log("    Thumbnail: " + (p.thumbnail_large || {}).src);
+      console.log("    Full page: " + p.link);
+    });
+    expect(photos.length).to.be.greaterThan(0);
   });
 }

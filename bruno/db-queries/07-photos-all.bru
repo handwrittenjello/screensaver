@@ -1,0 +1,48 @@
+meta {
+  name: Photos DB - All Cached
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/photos
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("Every row has required fields", function() {
+    const rows = res.getBody();
+    rows.forEach(function(r) {
+      expect(r).to.have.property("key");
+      expect(r).to.have.property("local_path");
+      expect(r).to.have.property("source");
+      expect(r).to.have.property("last_updated");
+    });
+  });
+
+  test("Log photo cache summary", function() {
+    const rows = res.getBody();
+    const withPhoto    = rows.filter(function(r) { return r.local_path; });
+    const withoutPhoto = rows.filter(function(r) { return !r.local_path; });
+    console.log("Total cached: " + rows.length + "  (with photo: " + withPhoto.length + "  missing: " + withoutPhoto.length + ")");
+    withPhoto.forEach(function(r) {
+      console.log("  [OK] " + r.key + "  -> " + r.local_path + "  (" + (r.source || "?") + ")");
+    });
+    if (withoutPhoto.length > 0) {
+      console.log("--- Models with no photo ---");
+      withoutPhoto.forEach(function(r) {
+        console.log("  [--] " + r.key + "  (" + (r.source || "?") + ")");
+      });
+    }
+    expect(rows.length).to.be.at.least(0);
+  });
+}

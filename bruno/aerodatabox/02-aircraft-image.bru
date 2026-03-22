@@ -1,0 +1,59 @@
+meta {
+  name: AeroDataBox - Aircraft Image by Registration
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://aerodatabox.p.rapidapi.com/aircrafts/reg/{{testReg}}/image/beta
+  body: none
+  auth: none
+}
+
+headers {
+  x-rapidapi-key: {{aerodataboxApiKey}}
+  x-rapidapi-host: aerodatabox.p.rapidapi.com
+}
+
+vars:pre-request {
+  testReg: G-EUOE
+}
+
+tests {
+  test("Status is 200 (image found) or 204 (no image)", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+
+  test("If 200 — response has a url field", function() {
+    if (res.getStatus() !== 200) return;
+    const data = res.getBody();
+    expect(data).to.have.property("url");
+    expect(data.url).to.be.a("string").and.match(/^https?:\/\//);
+  });
+
+  test("If 200 — response has author and license fields", function() {
+    if (res.getStatus() !== 200) return;
+    const data = res.getBody();
+    expect(data).to.have.property("author");
+    expect(data).to.have.property("license");
+  });
+
+  test("Log image result", function() {
+    const reg = bru.getVar("testReg");
+    if (res.getStatus() === 204) {
+      console.log("No image found for " + reg + " (204 No Content)");
+      return;
+    }
+    const data = res.getBody();
+    console.log("Image for " + reg + ":");
+    console.log("  URL:     " + data.url);
+    console.log("  Title:   " + (data.title || "-"));
+    console.log("  Author:  " + (data.author || "-"));
+    console.log("  License: " + (data.license || "-"));
+    console.log("  Web:     " + (data.webUrl || "-"));
+    if (data.htmlAttributions && data.htmlAttributions.length > 0) {
+      console.log("  Attribution: " + data.htmlAttributions[0]);
+    }
+    expect(res.getStatus()).to.equal(200);
+  });
+}

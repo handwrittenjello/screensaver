@@ -1,7 +1,7 @@
 meta {
   name: Get Flights - Custom Radius
   type: http
-  seq: 9
+  seq: 8
 }
 
 get {
@@ -42,7 +42,6 @@ tests {
 
   test("Custom radius returns more flights than default 5mi", function() {
     const flights = res.getBody().flights;
-    // Log count for visibility — not a hard assertion since airspace varies
     console.log("Flights found within " + bru.getVar("testRadius") + " mi: " + flights.length);
     expect(flights.length).to.be.at.least(0);
   });
