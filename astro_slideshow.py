@@ -536,65 +536,72 @@ def _get_photo(icao24):
     except Exception:
         pass
 
-    # Phase 1.5: AeroDataBox aircraft image by registration
-    # Looks up reg + model from route_cache, checks aircraft_photo_cache DB first,
-    # then calls AeroDataBox. Downloads image locally; caches by model key.
-    # Note: modeS from AeroDataBox is stored uppercase; compare case-insensitively.
-    api_key = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
-    if api_key:
-        try:
-            con = sqlite3.connect(_DB_PATH)
-            con.row_factory = sqlite3.Row
-            row = con.execute(
-                "SELECT reg_number, model FROM route_cache WHERE UPPER(hex) = UPPER(?) AND reg_number != '' LIMIT 1",
-                (hex_key,)
-            ).fetchone()
-            con.close()
-            reg   = row["reg_number"] if row else ""
-            model = row["model"]      if row else ""
+    # Phase 1.5: check our local aircraft_photo_cache DB, then try AeroDataBox API.
+    # Step A: look up reg + model from route_cache (modeS stored uppercase, compare case-insensitively)
+    reg   = ""
+    model = ""
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT reg_number, model FROM route_cache WHERE UPPER(hex) = UPPER(?) AND reg_number != '' LIMIT 1",
+            (hex_key,)
+        ).fetchone()
+        con.close()
+        reg   = row["reg_number"] if row else ""
+        model = row["model"]      if row else ""
+    except Exception:
+        pass
 
-            # Check DB photo cache by model key before calling API.
-            # A row with empty local_path means we already checked and found nothing —
-            # skip the API call until the 90-day TTL expires.
-            if model:
-                con2 = sqlite3.connect(_DB_PATH)
-                con2.row_factory = sqlite3.Row
-                db_row = con2.execute(
-                    "SELECT local_path FROM aircraft_photo_cache WHERE key = ? AND last_updated > ?",
-                    (model, int(now) - PHOTO_DB_TTL)
-                ).fetchone()
-                con2.close()
-                if db_row is not None:
-                    local = db_row["local_path"] or ""
-                    if local and os.path.exists(os.path.join(os.getcwd(), local.lstrip("/"))):
-                        print(f"[photo] {hex_key}: aerodatabox model cache hit ({model})", flush=True)
-                        return _cache(local)
-                    # Row exists with empty path — already checked, no image available
-                else:
-                    # No DB record yet — call AeroDataBox and record the result either way
-                    if reg:
-                        r = requests.get(
-                            f"https://aerodatabox.p.rapidapi.com/aircrafts/reg/{reg}/image/beta",
-                            headers={
-                                "x-rapidapi-key":  api_key,
-                                "x-rapidapi-host": "aerodatabox.p.rapidapi.com",
-                            },
-                            timeout=3,
-                        )
-                        src_url = ""
-                        if r.status_code == 200:
-                            src_url = r.json().get("url", "")
-                        if src_url:
-                            safe = model.replace("/", "_").replace(" ", "_")
-                            dest = os.path.join(_AIRCRAFT_PHOTOS_DIR, f"{safe}.jpg")
-                            if _download_image(src_url, dest):
-                                local_path = f"/static/aircraft_photos/{safe}.jpg"
-                                _db_cache_photo(model, local_path, src_url, "aerodatabox")
-                                print(f"[photo] {hex_key}: aerodatabox image downloaded ({model})", flush=True)
-                                return _cache(local_path)
-                        # No image found (204, no URL, or download failed) — record the attempt
-                        print(f"[photo] {hex_key}: aerodatabox no image for {reg!r} model={model!r} status={r.status_code}", flush=True)
-                        _db_cache_photo(model, "", src_url, "aerodatabox")
+    # Step B: check aircraft_photo_cache by model key — always, regardless of API key.
+    # This covers images populated by fetch_aircraft_photos.py (Wikipedia/DuckDuckGo)
+    # as well as previously downloaded AeroDataBox images.
+    adb_already_checked = False
+    if model:
+        try:
+            con2 = sqlite3.connect(_DB_PATH)
+            con2.row_factory = sqlite3.Row
+            db_row = con2.execute(
+                "SELECT local_path FROM aircraft_photo_cache WHERE key = ? AND last_updated > ?",
+                (model, int(now) - PHOTO_DB_TTL)
+            ).fetchone()
+            con2.close()
+            if db_row is not None:
+                local = db_row["local_path"] or ""
+                if local and os.path.exists(os.path.join(os.getcwd(), local.lstrip("/"))):
+                    print(f"[photo] {hex_key}: photo cache hit ({model})", flush=True)
+                    return _cache(local)
+                # Row exists with empty path — AeroDataBox was already tried, skip API call
+                adb_already_checked = True
+        except Exception:
+            pass
+
+    # Step C: call AeroDataBox image API only if we haven't already recorded a miss
+    api_key = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
+    if api_key and reg and model and not adb_already_checked:
+        try:
+            r = requests.get(
+                f"https://aerodatabox.p.rapidapi.com/aircrafts/reg/{reg}/image/beta",
+                headers={
+                    "x-rapidapi-key":  api_key,
+                    "x-rapidapi-host": "aerodatabox.p.rapidapi.com",
+                },
+                timeout=3,
+            )
+            src_url = ""
+            if r.status_code == 200:
+                src_url = r.json().get("url", "")
+            if src_url:
+                safe = model.replace("/", "_").replace(" ", "_")
+                dest = os.path.join(_AIRCRAFT_PHOTOS_DIR, f"{safe}.jpg")
+                if _download_image(src_url, dest):
+                    local_path = f"/static/aircraft_photos/{safe}.jpg"
+                    _db_cache_photo(model, local_path, src_url, "aerodatabox")
+                    print(f"[photo] {hex_key}: aerodatabox image downloaded ({model})", flush=True)
+                    return _cache(local_path)
+            # No image found (204, no URL, or download failed) — record the attempt
+            print(f"[photo] {hex_key}: aerodatabox no image for {reg!r} model={model!r} status={r.status_code}", flush=True)
+            _db_cache_photo(model, "", src_url, "aerodatabox")
         except Exception as e:
             print(f"[photo] {hex_key}: aerodatabox phase error: {e}", flush=True)
 
