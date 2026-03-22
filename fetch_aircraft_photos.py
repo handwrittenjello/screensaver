@@ -116,10 +116,10 @@ def wikipedia_page_image_url(title):
 # DuckDuckGo fallback
 # ---------------------------------------------------------------------------
 
-def duckduckgo_image_url(model):
-    """Return a photo URL from DuckDuckGo image search, or None."""
+def duckduckgo_image_urls(model):
+    """Return a list of candidate image URLs from DuckDuckGo, or []."""
     if not DDGS_AVAILABLE:
-        return None
+        return []
     try:
         results = DDGS().images(
             f"{model} aircraft",
@@ -127,11 +127,10 @@ def duckduckgo_image_url(model):
             safesearch="moderate",
             type_image="photo",
         )
-        if results:
-            return results[0]["image"]
+        return [r["image"] for r in results] if results else []
     except Exception as e:
         print(f"    DuckDuckGo error: {e}")
-    return None
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -231,39 +230,42 @@ def main():
             print(f"  [dry-run] {model}")
             continue
 
-        # Step 1a: Wikipedia
-        image_url = None
-        source    = None
+        # Step 1a: Wikipedia — single URL from article thumbnail
+        candidates = []  # list of (url, source_label)
         title = wikipedia_search_title(model)
         if title:
-            image_url = wikipedia_page_image_url(title)
-            if image_url:
-                source = "wikipedia"
+            wiki_url = wikipedia_page_image_url(title)
+            if wiki_url:
+                candidates.append((wiki_url, f"Wikipedia '{title}'"))
 
-        # Step 1b: DuckDuckGo fallback
-        if not image_url:
-            image_url = duckduckgo_image_url(model)
-            if image_url:
-                source = "duckduckgo"
+        # Step 1b: DuckDuckGo fallback — up to 5 candidate URLs
+        if not candidates:
+            for url in duckduckgo_image_urls(model):
+                candidates.append((url, "DuckDuckGo"))
 
-        if not image_url:
+        if not candidates:
             print(f"  x {model}  (no image found via Wikipedia or DuckDuckGo)")
             not_found += 1
             time.sleep(0.5)
             continue
 
-        # Step 2: download + save
+        # Step 2: try each candidate URL until one downloads successfully
         filename   = f"{safe_filename(model)}.jpg"
         dest_path  = os.path.join(OUTPUT_DIR, filename)
         local_path = f"/static/aircraft_types/{filename}"
 
-        if download_and_save(image_url, dest_path):
-            update_db(model, local_path, image_url, source)
-            label = f"via Wikipedia '{title}'" if source == "wikipedia" else "via DuckDuckGo"
-            print(f"  + {model}  ->  {filename}  ({label})")
-            found += 1
-        else:
-            print(f"  x {model}  (download failed: {image_url})")
+        downloaded = False
+        for image_url, label in candidates:
+            if download_and_save(image_url, dest_path):
+                source = "wikipedia" if label.startswith("Wikipedia") else "duckduckgo"
+                update_db(model, local_path, image_url, source)
+                print(f"  + {model}  ->  {filename}  (via {label})")
+                found += 1
+                downloaded = True
+                break
+
+        if not downloaded:
+            print(f"  x {model}  (all {len(candidates)} candidate(s) failed)")
             not_found += 1
 
         time.sleep(0.5)
