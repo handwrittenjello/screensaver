@@ -814,9 +814,9 @@
     }
     function flightCardHtml(f, isRecent) {
       const fmtAirport = (city, code) => city ? `${city} (${code})` : code;
-      const route = (f.origin && f.destination)
-        ? `${fmtAirport(f.origin_city, f.origin)} → ${fmtAirport(f.destination_city, f.destination)}`
-        : '';
+      const routeFrom = f.origin      ? fmtAirport(f.origin_city, f.origin)           : '?';
+      const routeTo   = f.destination ? fmtAirport(f.destination_city, f.destination) : '?';
+      const route = (f.origin || f.destination) ? `${routeFrom} → ${routeTo}` : '';
       const alt   = f.altitude_ft != null ? f.altitude_ft.toLocaleString() + ' ft' : '';
       const spd   = f.speed_mph   != null ? f.speed_mph + ' mph' : '';
       const stats = [alt, spd, f.distance_mi != null ? f.distance_mi + ' mi' : '', degreesToCompass(f.heading_deg)]
