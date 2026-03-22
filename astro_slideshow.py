@@ -230,7 +230,12 @@ def _get_route_from_aerodatabox(callsign):
         )
         if r.status_code != 200:
             return {}
-        flights = r.json()
+        # AeroDataBox sometimes appends a rate-limit JSON object after the valid array,
+        # making the full body invalid JSON. raw_decode() stops at the first value.
+        try:
+            flights, _ = json.JSONDecoder().raw_decode(r.text.strip())
+        except ValueError:
+            return {}
         if not flights or not isinstance(flights, list):
             return {}
         f        = flights[0]
@@ -300,7 +305,8 @@ def _get_route_from_aerodatabox(callsign):
             "destination":  arr_apt.get("iata", ""),
             "airline_iata": airline.get("iata",  ""),
         }
-    except Exception:
+    except Exception as e:
+        print(f"[AeroDataBox] error for {callsign}: {e}", flush=True)
         return {}
 
 
