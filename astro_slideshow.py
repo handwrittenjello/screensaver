@@ -518,7 +518,8 @@ def _get_photo(icao24):
         return cached["url"]
 
     def _cache(url):
-        _photo_cache[hex_key] = {"url": url, "ts": now}
+        if url:  # only cache hits; misses fall through every time so new DB entries are picked up
+            _photo_cache[hex_key] = {"url": url, "ts": now}
         return url
 
     def _db_cache_photo(model_key, local_path, source_url, source):
