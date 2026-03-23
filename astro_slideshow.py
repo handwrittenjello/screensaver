@@ -1,11 +1,21 @@
 import os
 import json
 import random
+import re
 import sqlite3
+import subprocess
+import sys
 import time
 import requests
 from math import radians, sin, cos, sqrt, atan2
 from flask import Flask, jsonify, render_template, request
+
+try:
+    from PIL import Image as PilImage
+    from io import BytesIO
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -909,6 +919,71 @@ def api_photos_all():
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/photos')
+def admin_photos():
+    return render_template('admin_photos.html')
+
+
+@app.route('/admin/run-fetch', methods=['POST'])
+def admin_run_fetch():
+    """Run fetch_aircraft_photos.py as a subprocess and return captured output."""
+    script = os.path.join(os.getcwd(), 'fetch_aircraft_photos.py')
+    try:
+        result = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, timeout=120
+        )
+        return jsonify({
+            'stdout':     result.stdout,
+            'stderr':     result.stderr,
+            'returncode': result.returncode,
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'stdout': '', 'stderr': 'Script timed out after 120s.', 'returncode': -1})
+    except Exception as e:
+        return jsonify({'stdout': '', 'stderr': str(e), 'returncode': -1})
+
+
+@app.route('/admin/photos/upload', methods=['POST'])
+def admin_photos_upload():
+    """Upload a photo for a specific aircraft model and update aircraft_photo_cache."""
+    model = request.form.get('model', '').strip()
+    file  = request.files.get('file')
+
+    if not model:
+        return jsonify({'ok': False, 'error': 'Model name is required.'}), 400
+    if not file or file.filename == '':
+        return jsonify({'ok': False, 'error': 'No file provided.'}), 400
+    if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+        return jsonify({'ok': False, 'error': 'File must be an image (jpg, png, gif, webp).'}), 400
+
+    safe       = re.sub(r'[^\w\-]', '_', model).strip('_')
+    dest       = os.path.join(_AIRCRAFT_TYPES_DIR, f'{safe}.jpg')
+    local_path = f'/static/aircraft_types/{safe}.jpg'
+
+    try:
+        raw = file.read()
+        if PILLOW_AVAILABLE:
+            img = PilImage.open(BytesIO(raw))
+            img.thumbnail((800, 600), PilImage.LANCZOS)
+            img.convert('RGB').save(dest, 'JPEG', quality=85)
+        else:
+            with open(dest, 'wb') as f:
+                f.write(raw)
+
+        con = sqlite3.connect(_DB_PATH)
+        con.execute(
+            "INSERT OR REPLACE INTO aircraft_photo_cache VALUES (?,?,?,?,?)",
+            (model, local_path, '', 'upload', int(time.time()))
+        )
+        con.commit()
+        con.close()
+
+        return jsonify({'ok': True, 'local_path': local_path})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
