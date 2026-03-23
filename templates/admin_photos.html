@@ -117,7 +117,25 @@
 </section>
 
 <!-- ================================================================
-     Section 2: Auto-fetch runner
+     Section 2: Photo Library
+     ================================================================ -->
+<section>
+  <h2>Photo Library <span id="library-count" class="count"></span></h2>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    <input type="text" id="library-search" placeholder="Filter by model name..."
+      oninput="renderLibrary()"
+      style="background:#111;border:1px solid #444;color:#fff;padding:6px 10px;font-family:monospace;font-size:13px;width:280px;">
+    <label style="color:#888;font-size:12px;display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="library-show-all" onchange="renderLibrary()"> Show empty (no photo)
+    </label>
+  </div>
+  <div id="library-wrap">
+    <p class="empty">Loading...</p>
+  </div>
+</section>
+
+<!-- ================================================================
+     Section 4: Auto-fetch runner
      ================================================================ -->
 <section>
   <h2>Auto-Fetch (Wikipedia / DuckDuckGo)</h2>
@@ -130,7 +148,7 @@
 </section>
 
 <!-- ================================================================
-     Section 3: Manual upload (any model)
+     Section 5: Manual upload (any model)
      ================================================================ -->
 <section>
   <h2>Manual Upload</h2>
@@ -372,9 +390,101 @@ async function manualUpload() {
 }
 
 // ----------------------------------------------------------------
+// Section 2: Photo Library
+// ----------------------------------------------------------------
+let libraryData = [];
+
+async function loadLibrary() {
+  const wrap    = document.getElementById('library-wrap');
+  const countEl = document.getElementById('library-count');
+  try {
+    const res  = await fetch('/api/photos');
+    libraryData = await res.json();
+    renderLibrary();
+  } catch(e) {
+    wrap.innerHTML = `<p class="empty">Failed to load: ${e.message}</p>`;
+  }
+}
+
+function renderLibrary() {
+  const wrap      = document.getElementById('library-wrap');
+  const countEl   = document.getElementById('library-count');
+  const query     = document.getElementById('library-search').value.toLowerCase();
+  const showEmpty = document.getElementById('library-show-all').checked;
+
+  let rows = libraryData.filter(r => {
+    if (!showEmpty && !r.local_path) return false;
+    if (query && !r.key.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  countEl.textContent = `(${rows.length} shown / ${libraryData.length} total)`;
+
+  if (!rows.length) {
+    wrap.innerHTML = '<p class="empty">No entries match.</p>';
+    return;
+  }
+
+  const tbody = rows.map(r => {
+    const thumb  = r.local_path
+      ? `<img class="thumb" src="${escHtml(r.local_path)}?t=${Date.now()}" alt="" onerror="this.style.opacity=0.2">`
+      : '<span style="color:#555">—</span>';
+    const src    = r.source || '—';
+    const ts     = r.last_updated ? new Date(r.last_updated * 1000).toLocaleString() : '—';
+    const delBtn = r.local_path
+      ? `<button onclick="deletePhoto(${JSON.stringify(r.key)}, this)" style="color:#f88;border-color:rgba(255,100,100,0.3)">Delete</button>`
+      : '<span style="color:#444">no file</span>';
+    return `<tr>
+      <td>${escHtml(r.key)}</td>
+      <td>${thumb}</td>
+      <td>${escHtml(src)}</td>
+      <td>${ts}</td>
+      <td>${delBtn}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>Model</th><th>Preview</th><th>Source</th><th>Last Updated</th><th>Actions</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+}
+
+async function deletePhoto(key, btn) {
+  if (!confirm(`Delete photo for:\n"${key}"\n\nThis removes the file from disk and resets the DB entry.`)) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const res  = await fetch('/admin/photos/delete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // Update local data and re-render without a full reload
+      const entry = libraryData.find(r => r.key === key);
+      if (entry) { entry.local_path = ''; entry.source = 'none'; entry.source_url = ''; }
+      renderLibrary();
+      // Refresh missing table since this entry is now missing again
+      await loadMissing();
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+      alert(`Delete failed: ${data.error}`);
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Delete';
+    alert(e.message);
+  }
+}
+
+// ----------------------------------------------------------------
 // Init
 // ----------------------------------------------------------------
 loadMissing();
+loadLibrary();
 </script>
 </body>
 </html>

@@ -974,15 +974,75 @@ def admin_photos_upload():
             with open(dest, 'wb') as f:
                 f.write(raw)
 
+        now_ts = int(time.time())
         con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        # Upsert the row for the exact typed model key
         con.execute(
             "INSERT OR REPLACE INTO aircraft_photo_cache VALUES (?,?,?,?,?)",
-            (model, local_path, '', 'upload', int(time.time()))
+            (model, local_path, '', 'upload', now_ts)
         )
+        # Also fix any other missing rows whose safe filename resolves to the same file.
+        # This handles the case where the DB key differs slightly from what the user typed
+        # (e.g. "MU-2B-60 Marquise" vs "MU-2B -60  Marquise") but both map to the same .jpg.
+        missing_keys = [r["key"] for r in con.execute(
+            "SELECT key FROM aircraft_photo_cache WHERE local_path = '' AND key != ?", (model,)
+        ).fetchall()]
+        def _norm(s):
+            return re.sub(r'_+', '_', re.sub(r'[^\w\-]', '_', s)).strip('_')
+        for mk in missing_keys:
+            if _norm(mk) == _norm(model):
+                con.execute(
+                    "UPDATE aircraft_photo_cache SET local_path=?, source=?, last_updated=? WHERE key=?",
+                    (local_path, 'upload', now_ts, mk)
+                )
+                print(f"[upload] also updated mismatched key {mk!r} -> {local_path}", flush=True)
         con.commit()
         con.close()
 
         return jsonify({'ok': True, 'local_path': local_path})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/admin/photos/delete', methods=['POST'])
+def admin_photos_delete():
+    """Clear a photo entry: delete the local file and reset the DB row to local_path=''."""
+    data  = request.get_json(silent=True) or {}
+    key   = data.get('key', '').strip()
+    if not key:
+        return jsonify({'ok': False, 'error': 'key is required'}), 400
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT local_path FROM aircraft_photo_cache WHERE key = ?", (key,)
+        ).fetchone()
+        if row is None:
+            con.close()
+            return jsonify({'ok': False, 'error': 'Key not found'}), 404
+        local_path = row['local_path'] or ''
+        # Delete file from disk if it lives in one of our managed dirs
+        if local_path:
+            abs_path = os.path.join(os.getcwd(), local_path.lstrip('/'))
+            managed  = (
+                abs_path.startswith(_AIRCRAFT_TYPES_DIR) or
+                abs_path.startswith(_AIRCRAFT_PHOTOS_DIR)
+            )
+            if managed and os.path.exists(abs_path):
+                os.remove(abs_path)
+                print(f"[delete] removed file {abs_path}", flush=True)
+        # Reset the DB row so it shows as missing again (available for re-fetch/upload)
+        con.execute(
+            "UPDATE aircraft_photo_cache SET local_path='', source='none', source_url='', last_updated=? WHERE key=?",
+            (int(time.time()), key)
+        )
+        con.commit()
+        con.close()
+        # Evict in-memory photo cache entries that referenced this file
+        global _photo_cache
+        _photo_cache = {k: v for k, v in _photo_cache.items() if v.get('url') != local_path}
+        return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
