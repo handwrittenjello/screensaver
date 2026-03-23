@@ -432,7 +432,7 @@ function renderLibrary() {
     const src    = r.source || '—';
     const ts     = r.last_updated ? new Date(r.last_updated * 1000).toLocaleString() : '—';
     const delBtn = r.local_path
-      ? `<button onclick="deletePhoto(${JSON.stringify(r.key)}, this)" style="color:#f88;border-color:rgba(255,100,100,0.3)">Delete</button>`
+      ? `<button onclick="deletePhoto(${escHtml(JSON.stringify(r.key))}, this)" style="color:#f88;border-color:rgba(255,100,100,0.3)">Delete</button>`
       : '<span style="color:#444">no file</span>';
     return `<tr>
       <td>${escHtml(r.key)}</td>
