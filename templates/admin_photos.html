@@ -81,6 +81,25 @@
   .empty { color: #555; font-style: italic; padding: 12px; }
   .count { color: #888; font-size: 12px; margin-left: 8px; }
   .fetch-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .paste-zone {
+    border: 2px dashed rgba(255,255,255,0.2);
+    padding: 16px 20px;
+    color: #666;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 180px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .paste-zone:hover, .paste-zone.active { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.04); }
+  .paste-zone img { max-height: 80px; max-width: 160px; object-fit: contain; display: block; }
+  .paste-zone.has-image { border-color: rgba(100,255,100,0.4); color: #6f6; }
+  .row-paste-hint { font-size: 11px; color: #555; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -123,8 +142,11 @@
     </label>
     <label>
       Image file
-      <input type="file" id="manual-file" accept="image/*">
+      <input type="file" id="manual-file" accept="image/*" onchange="onManualFileChange()">
     </label>
+    <div id="manual-paste-zone" class="paste-zone" onclick="document.getElementById('manual-file').click()" title="Click to browse or paste (Ctrl+V) / drag an image here">
+      <span id="manual-paste-label">Ctrl+V to paste<br>or click to browse</span>
+    </div>
     <button onclick="manualUpload()">Upload</button>
   </div>
   <div id="manual-msg"></div>
@@ -139,14 +161,77 @@ function setMsg(el, text, type) {
   el.className = 'msg ' + (type || '');
 }
 
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ----------------------------------------------------------------
+// Clipboard / paste state
+// ----------------------------------------------------------------
+let manualPastedFile = null;   // file waiting in the manual paste zone
+let activeRowIndex   = null;   // index of the currently-open row upload panel
+const rowPastedFiles = {};     // rowIndex -> File
+
+function extractImageFromClipboard(e) {
+  const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items || [];
+  for (const item of items) {
+    if (item.type.startsWith('image/')) return item.getAsFile();
+  }
+  return null;
+}
+
+document.addEventListener('paste', (e) => {
+  const file = extractImageFromClipboard(e);
+  if (!file) return;
+  e.preventDefault();
+
+  if (activeRowIndex !== null) {
+    setRowPaste(activeRowIndex, file);
+  } else {
+    setManualPaste(file);
+  }
+});
+
+function setManualPaste(file) {
+  manualPastedFile = file;
+  const zone  = document.getElementById('manual-paste-zone');
+  const label = document.getElementById('manual-paste-label');
+  zone.classList.add('has-image');
+  // show preview inside the paste zone
+  const url = URL.createObjectURL(file);
+  label.innerHTML = `<img src="${url}" style="max-height:80px;max-width:160px;object-fit:contain"><br><span style="font-size:11px;color:#aaa">${escHtml(file.name || 'pasted image')}</span>`;
+}
+
+function onManualFileChange() {
+  const fileInput = document.getElementById('manual-file');
+  if (fileInput.files.length) {
+    manualPastedFile = null;
+    setManualPaste(fileInput.files[0]);
+  }
+}
+
+function setRowPaste(i, file) {
+  rowPastedFiles[i] = file;
+  const preview = document.getElementById(`row-preview-${i}`);
+  if (preview) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  }
+}
+
+function onRowFileChange(i) {
+  const fileInput = document.getElementById(`upload-file-${i}`);
+  if (fileInput.files.length) setRowPaste(i, fileInput.files[0]);
+}
+
 // ----------------------------------------------------------------
 // Section 1: load missing models table
 // ----------------------------------------------------------------
 async function loadMissing() {
-  const wrap = document.getElementById('missing-table-wrap');
+  const wrap    = document.getElementById('missing-table-wrap');
   const countEl = document.getElementById('missing-count');
   try {
-    const res = await fetch('/api/photos/missing');
+    const res  = await fetch('/api/photos/missing');
     const rows = await res.json();
     countEl.textContent = `(${rows.length})`;
     if (!rows.length) {
@@ -163,8 +248,10 @@ async function loadMissing() {
         </td>
       </tr>
       <tr class="upload-row" id="upload-row-${i}" style="display:none">
-        <td colspan="4">
-          <input type="file" id="upload-file-${i}" accept="image/*">
+        <td colspan="4" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:none">
+          <input type="file" id="upload-file-${i}" accept="image/*" onchange="onRowFileChange(${i})">
+          <span class="row-paste-hint">(or Ctrl+V to paste)</span>
+          <img id="row-preview-${i}" style="max-height:40px;max-width:70px;object-fit:contain;display:none" alt="">
           <button onclick="rowUpload(${i}, '${escHtml(r.key).replace(/'/g,"\\'")}')">Submit</button>
           <span id="upload-msg-${i}" class="msg"></span>
         </td>
@@ -180,36 +267,33 @@ async function loadMissing() {
   }
 }
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 function toggleUpload(i, model) {
   const row = document.getElementById(`upload-row-${i}`);
-  row.style.display = row.style.display === 'none' ? '' : 'none';
+  const opening = row.style.display === 'none';
+  row.style.display = opening ? '' : 'none';
+  activeRowIndex = opening ? i : null;
 }
 
 async function rowUpload(i, model) {
-  const fileInput = document.getElementById(`upload-file-${i}`);
+  const file  = rowPastedFiles[i] || (document.getElementById(`upload-file-${i}`)?.files[0]);
   const msgEl = document.getElementById(`upload-msg-${i}`);
-  if (!fileInput.files.length) { setMsg(msgEl, 'No file selected.', 'err'); return; }
+  if (!file) { setMsg(msgEl, 'No file selected — pick a file or paste (Ctrl+V).', 'err'); return; }
   setMsg(msgEl, 'Uploading...', '');
   const fd = new FormData();
   fd.append('model', model);
-  fd.append('file', fileInput.files[0]);
+  fd.append('file', file, file.name || 'paste.jpg');
   try {
-    const res = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
+    const res  = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.ok) {
       setMsg(msgEl, 'Uploaded!', 'ok');
-      // show thumbnail in the main row
-      const thumbEl = document.getElementById(`thumb-${i}`);
-      thumbEl.innerHTML = `<img class="thumb" src="${escHtml(data.local_path)}?t=${Date.now()}" alt="">`;
-      // hide the upload row button
-      const mainRow = document.getElementById(`row-${i}`);
-      const btn = mainRow.querySelector('button');
+      document.getElementById(`thumb-${i}`).innerHTML =
+        `<img class="thumb" src="${escHtml(data.local_path)}?t=${Date.now()}" alt="">`;
+      const btn = document.getElementById(`row-${i}`)?.querySelector('button');
       if (btn) btn.disabled = true;
       document.getElementById(`upload-row-${i}`).style.display = 'none';
+      delete rowPastedFiles[i];
+      activeRowIndex = null;
     } else {
       setMsg(msgEl, data.error || 'Upload failed.', 'err');
     }
@@ -222,10 +306,10 @@ async function rowUpload(i, model) {
 // Section 2: auto-fetch runner
 // ----------------------------------------------------------------
 async function runFetch() {
-  const btn = document.getElementById('fetch-btn');
+  const btn     = document.getElementById('fetch-btn');
   const spinner = document.getElementById('fetch-spinner');
-  const msgEl = document.getElementById('fetch-msg');
-  const pre = document.getElementById('fetch-output');
+  const msgEl   = document.getElementById('fetch-msg');
+  const pre     = document.getElementById('fetch-output');
 
   btn.disabled = true;
   spinner.style.display = 'inline-block';
@@ -233,16 +317,11 @@ async function runFetch() {
   pre.textContent = '';
 
   try {
-    const res = await fetch('/admin/run-fetch', { method: 'POST' });
+    const res  = await fetch('/admin/run-fetch', { method: 'POST' });
     const data = await res.json();
-    const out = [data.stdout, data.stderr].filter(Boolean).join('\n--- stderr ---\n');
+    const out  = [data.stdout, data.stderr].filter(Boolean).join('\n--- stderr ---\n');
     pre.textContent = out || '(no output)';
-    if (data.returncode === 0) {
-      setMsg(msgEl, 'Done.', 'ok');
-    } else {
-      setMsg(msgEl, `Exit code ${data.returncode}`, 'err');
-    }
-    // refresh the missing table
+    setMsg(msgEl, data.returncode === 0 ? 'Done.' : `Exit code ${data.returncode}`, data.returncode === 0 ? 'ok' : 'err');
     await loadMissing();
   } catch(e) {
     pre.textContent = e.message;
@@ -265,19 +344,24 @@ async function manualUpload() {
 
   const model = modelInput.value.trim();
   if (!model) { setMsg(msgEl, 'Model name is required.', 'err'); return; }
-  if (!fileInput.files.length) { setMsg(msgEl, 'No file selected.', 'err'); return; }
+
+  const file = manualPastedFile || fileInput.files[0];
+  if (!file) { setMsg(msgEl, 'No image — pick a file, paste (Ctrl+V), or drag one in.', 'err'); return; }
 
   setMsg(msgEl, 'Uploading...', '');
   const fd = new FormData();
   fd.append('model', model);
-  fd.append('file', fileInput.files[0]);
+  fd.append('file', file, file.name || 'paste.jpg');
   try {
-    const res = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
+    const res  = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.ok) {
       setMsg(msgEl, `Saved to ${data.local_path}`, 'ok');
       modelInput.value = '';
       fileInput.value  = '';
+      manualPastedFile = null;
+      document.getElementById('manual-paste-zone').classList.remove('has-image');
+      document.getElementById('manual-paste-label').innerHTML = 'Ctrl+V to paste<br>or click to browse';
       await loadMissing();
     } else {
       setMsg(msgEl, data.error || 'Upload failed.', 'err');
