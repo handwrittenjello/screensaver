@@ -16,20 +16,20 @@ headers {
 }
 
 vars:pre-request {
-  testCallsign: AAL1
+  testCallsign: N2348J
 }
 
 tests {
   test("Status is 200", function() {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is a non-empty array", function() {
     const data = res.getBody();
     expect(data).to.be.an("array");
     expect(data.length).to.be.greaterThan(0);
   });
-
+  
   test("First flight has departure airport with IATA", function() {
     const f = res.getBody()[0];
     expect(f).to.have.property("departure");
@@ -37,7 +37,7 @@ tests {
     expect(f.departure.airport).to.have.property("iata");
     expect(f.departure.airport.iata).to.be.a("string").and.have.lengthOf(3);
   });
-
+  
   test("First flight has arrival airport with IATA", function() {
     const f = res.getBody()[0];
     expect(f).to.have.property("arrival");
@@ -45,19 +45,19 @@ tests {
     expect(f.arrival.airport).to.have.property("iata");
     expect(f.arrival.airport.iata).to.be.a("string").and.have.lengthOf(3);
   });
-
+  
   test("First flight has airline info", function() {
     const f = res.getBody()[0];
     expect(f).to.have.property("airline");
     expect(f.airline).to.have.property("iata");
   });
-
+  
   test("First flight has aircraft info", function() {
     const f = res.getBody()[0];
     expect(f).to.have.property("aircraft");
     expect(f.aircraft).to.have.property("model");
   });
-
+  
   test("Log full flight details", function() {
     const flights = res.getBody();
     console.log("Flights for callsign " + bru.getVar("testCallsign") + ": " + flights.length);

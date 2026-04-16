@@ -52,7 +52,10 @@ Edit `config/config.json`:
     "OPENSKY_CLIENT_ID": "your_client_id",
     "OPENSKY_CLIENT_SECRET": "your_client_secret",
     "AIRLABS_API_KEY": "your_key_here",
-    "AERODATABOX_RAPIDAPI_KEY": "your_rapidapi_key_here"
+    "AERODATABOX_RAPIDAPI_KEY": "your_rapidapi_key_here",
+    "AERODATABOX_ENABLED": true,
+    "FLIGHT_POLL_INTERVAL": 90,
+    "ROUTE_CACHE_TTL_HOURS": 12
 }
 ```
 
@@ -64,6 +67,9 @@ Edit `config/config.json`:
 | `OPENSKY_CLIENT_ID/SECRET` | [opensky-network.org](https://opensky-network.org) | Free; higher rate limits than anonymous |
 | `AIRLABS_API_KEY` | [airlabs.co](https://airlabs.co) | Free tier (1,000 calls/month); commercial route fallback |
 | `AERODATABOX_RAPIDAPI_KEY` | [rapidapi.com/aedbx/api/aerodatabox](https://rapidapi.com/aedbx/api/aerodatabox) | $5/month Pro (~6,000 calls); primary route + image source |
+| `AERODATABOX_ENABLED` | — | Set to `false` to pause all AeroDataBox calls without removing the key |
+| `FLIGHT_POLL_INTERVAL` | — | Seconds between flight updates (default `90`); lower = more responsive but more API calls |
+| `ROUTE_CACHE_TTL_HOURS` | — | How long a cached route is reused before re-fetching (default `12`); higher = fewer API calls |
 
 ### 3. Add images
 

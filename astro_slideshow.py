@@ -364,7 +364,7 @@ def _get_opensky_token():
         return None
 
 
-ROUTE_CACHE_TTL = 4 * 3600  # 4 hours — flights change throughout the day
+ROUTE_CACHE_TTL = config_data.get("ROUTE_CACHE_TTL_HOURS", 12) * 3600
 
 def _get_route(icao24, callsign):
     """
@@ -407,11 +407,12 @@ def _get_route(icao24, callsign):
     data = {}
 
     # Primary: AeroDataBox via RapidAPI — try for ALL callsigns including N-numbers
-    if callsign and config_data.get("AERODATABOX_RAPIDAPI_KEY", ""):
+    adb_enabled = config_data.get("AERODATABOX_ENABLED", True)
+    if adb_enabled and callsign and config_data.get("AERODATABOX_RAPIDAPI_KEY", ""):
         data = _get_route_from_aerodatabox(callsign)
         print(f"[route] {cs}: aerodatabox -> origin={data.get('origin')!r} dest={data.get('destination')!r}", flush=True)
     else:
-        print(f"[route] {cs}: aerodatabox SKIPPED (key={'set' if config_data.get('AERODATABOX_RAPIDAPI_KEY') else 'MISSING'})", flush=True)
+        print(f"[route] {cs}: aerodatabox SKIPPED (enabled={adb_enabled} key={'set' if config_data.get('AERODATABOX_RAPIDAPI_KEY') else 'MISSING'})", flush=True)
 
     # Secondary + fallback: skip for N-numbers (AirLabs/adsbdb have no private plane data)
     if not data.get("origin") and not is_n_number:
@@ -588,8 +589,9 @@ def _get_photo(icao24):
             pass
 
     # Step C: call AeroDataBox image API only if we haven't already recorded a miss
-    api_key = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
-    if api_key and reg and model and not adb_already_checked:
+    api_key     = config_data.get("AERODATABOX_RAPIDAPI_KEY", "")
+    adb_enabled = config_data.get("AERODATABOX_ENABLED", True)
+    if adb_enabled and api_key and reg and model and not adb_already_checked:
         try:
             r = requests.get(
                 f"https://aerodatabox.p.rapidapi.com/aircrafts/reg/{reg}/image/beta",
@@ -654,7 +656,8 @@ def _get_photo(icao24):
 
 @app.route('/')
 def index():
-    return render_template("index.html")  # Serves your front end
+    poll_ms = int(config_data.get("FLIGHT_POLL_INTERVAL", 90)) * 1000
+    return render_template("index.html", flight_poll_ms=poll_ms)
 
 @app.route('/weather')
 def weather():
@@ -888,6 +891,36 @@ def api_routes_airline(airline_iata):
 def api_routes_model(model):
     rows = _query_routes("model LIKE ?", (f"%{model.strip()}%",))
     return jsonify(rows)
+
+
+@app.route('/api/stats')
+def api_stats():
+    """Return AeroDataBox and other API call counts by source, this month and all-time."""
+    from datetime import datetime, timezone
+    con = sqlite3.connect(_DB_PATH)
+    con.row_factory = sqlite3.Row
+    dt = datetime.now(timezone.utc)
+    month_start = int(datetime(dt.year, dt.month, 1, tzinfo=timezone.utc).timestamp())
+    month_rows = con.execute(
+        "SELECT data_source, COUNT(*) as cnt FROM route_cache"
+        " WHERE last_updated >= ? GROUP BY data_source ORDER BY cnt DESC",
+        (month_start,)
+    ).fetchall()
+    all_rows = con.execute(
+        "SELECT data_source, COUNT(*) as cnt FROM route_cache"
+        " GROUP BY data_source ORDER BY cnt DESC"
+    ).fetchall()
+    con.close()
+    return jsonify({
+        "this_month":      {r["data_source"]: r["cnt"] for r in month_rows},
+        "all_time":        {r["data_source"]: r["cnt"] for r in all_rows},
+        "month_start_ts":  month_start,
+        "settings": {
+            "aerodatabox_enabled":   config_data.get("AERODATABOX_ENABLED", True),
+            "flight_poll_interval":  config_data.get("FLIGHT_POLL_INTERVAL", 90),
+            "route_cache_ttl_hours": config_data.get("ROUTE_CACHE_TTL_HOURS", 12),
+        },
+    })
 
 
 @app.route('/api/photos/missing')

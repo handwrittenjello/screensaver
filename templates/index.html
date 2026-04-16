@@ -893,7 +893,7 @@
         .catch(() => renderFlights(null));
     }
     updateFlights();
-    setInterval(updateFlights, 30000);
+    setInterval(updateFlights, {{ flight_poll_ms }});
     // Shuffling function for arrays (Fisher-Yates)
     function shuffleArray(arr) {
       let array = arr.slice();

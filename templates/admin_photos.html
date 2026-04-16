@@ -8,47 +8,46 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #000; color: #fff; font-family: monospace; padding: 24px; font-size: 14px; }
   h1 { font-size: 1.4em; margin-bottom: 24px; color: #ccc; }
-  h2 { font-size: 1.1em; margin-bottom: 12px; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 6px; }
-  section { margin-bottom: 40px; }
+
+  /* Collapsible sections */
+  section { margin-bottom: 12px; border: 1px solid #222; }
+  .section-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; cursor: pointer; user-select: none;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid #222;
+  }
+  .section-header:hover { background: rgba(255,255,255,0.07); }
+  .section-caret { font-size: 10px; color: #666; transition: transform 0.15s; display: inline-block; }
+  .section-header.collapsed .section-caret { transform: rotate(-90deg); }
+  .section-title { font-size: 1.05em; color: #aaa; }
+  .section-body { padding: 16px 14px; }
+  .section-body.hidden { display: none; }
+
   table { border-collapse: collapse; width: 100%; }
   td, th { border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: left; vertical-align: middle; }
   th { background: rgba(255,255,255,0.06); color: #aaa; }
   tr:hover td { background: rgba(255,255,255,0.03); }
   button {
-    background: rgba(255,255,255,0.12);
-    color: #fff;
+    background: rgba(255,255,255,0.12); color: #fff;
     border: 1px solid rgba(255,255,255,0.25);
-    padding: 6px 14px;
-    cursor: pointer;
-    font-family: monospace;
-    font-size: 13px;
+    padding: 6px 14px; cursor: pointer; font-family: monospace; font-size: 13px;
   }
   button:hover:not(:disabled) { background: rgba(255,255,255,0.22); }
   button:disabled { opacity: 0.4; cursor: default; }
   pre {
-    background: #0d0d0d;
-    padding: 14px;
-    border: 1px solid #2a2a2a;
-    max-height: 400px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    color: #ccc;
-    margin-top: 12px;
-    min-height: 60px;
+    background: #0d0d0d; padding: 14px; border: 1px solid #2a2a2a;
+    max-height: 400px; overflow-y: auto; white-space: pre-wrap;
+    word-break: break-all; color: #ccc; margin-top: 12px; min-height: 60px;
   }
   img.thumb { max-height: 48px; max-width: 80px; object-fit: cover; display: block; }
   .upload-row td { background: rgba(255,255,200,0.04); }
   .upload-row input[type="file"] { color: #ccc; font-family: monospace; font-size: 12px; }
-  .upload-row input[type="file"]::file-selector-button {
-    background: rgba(255,255,255,0.12);
-    color: #fff;
+  .upload-row input[type="file"]::file-selector-button,
+  .manual-form input[type="file"]::file-selector-button {
+    background: rgba(255,255,255,0.12); color: #fff;
     border: 1px solid rgba(255,255,255,0.25);
-    padding: 4px 10px;
-    cursor: pointer;
-    font-family: monospace;
-    font-size: 12px;
-    margin-right: 8px;
+    padding: 4px 10px; cursor: pointer; font-family: monospace; font-size: 12px; margin-right: 8px;
   }
   .msg { font-size: 12px; margin-left: 8px; }
   .msg.ok  { color: #6f6; }
@@ -58,48 +57,43 @@
   .manual-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
   .manual-form label { display: flex; flex-direction: column; gap: 4px; color: #aaa; font-size: 12px; }
   .manual-form input[type="text"] {
-    background: #111;
-    border: 1px solid #444;
-    color: #fff;
-    padding: 6px 10px;
-    font-family: monospace;
-    font-size: 13px;
-    width: 280px;
+    background: #111; border: 1px solid #444; color: #fff;
+    padding: 6px 10px; font-family: monospace; font-size: 13px; width: 280px;
   }
   .manual-form input[type="file"] { color: #ccc; font-family: monospace; font-size: 12px; }
-  .manual-form input[type="file"]::file-selector-button {
-    background: rgba(255,255,255,0.12);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.25);
-    padding: 4px 10px;
-    cursor: pointer;
-    font-family: monospace;
-    font-size: 12px;
-    margin-right: 8px;
-  }
   #manual-msg { margin-top: 8px; font-size: 13px; }
   .empty { color: #555; font-style: italic; padding: 12px; }
-  .count { color: #888; font-size: 12px; margin-left: 8px; }
+  .count { color: #888; font-size: 12px; margin-left: 4px; }
   .fetch-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .paste-zone {
-    border: 2px dashed rgba(255,255,255,0.2);
-    padding: 16px 20px;
-    color: #666;
-    font-size: 12px;
-    cursor: pointer;
-    min-width: 180px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: border-color 0.15s, background 0.15s;
+    border: 2px dashed rgba(255,255,255,0.2); padding: 16px 20px; color: #666;
+    font-size: 12px; cursor: pointer; min-width: 180px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; transition: border-color 0.15s, background 0.15s;
   }
   .paste-zone:hover, .paste-zone.active { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.04); }
   .paste-zone img { max-height: 80px; max-width: 160px; object-fit: contain; display: block; }
   .paste-zone.has-image { border-color: rgba(100,255,100,0.4); color: #6f6; }
   .row-paste-hint { font-size: 11px; color: #555; margin-left: 6px; }
+
+  /* Pagination */
+  .pagination {
+    display: flex; align-items: center; gap: 8px; margin-top: 12px;
+    flex-wrap: wrap; font-size: 13px; color: #888;
+  }
+  .pagination button { padding: 4px 10px; font-size: 12px; }
+  .pagination select {
+    background: #111; border: 1px solid #444; color: #fff;
+    padding: 4px 8px; font-family: monospace; font-size: 12px; cursor: pointer;
+  }
+  .lib-controls {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .lib-controls input[type="text"] {
+    background: #111; border: 1px solid #444; color: #fff;
+    padding: 6px 10px; font-family: monospace; font-size: 13px; width: 260px;
+  }
+  .lib-controls label { color: #888; font-size: 12px; display: flex; align-items: center; gap: 6px; }
 </style>
 </head>
 <body>
@@ -107,67 +101,96 @@
 <h1>Aircraft Photos Admin</h1>
 
 <!-- ================================================================
+     Section 0: API Usage
+     ================================================================ -->
+<section id="sec-stats">
+  <div class="section-header collapsed" onclick="toggleSection('stats')">
+    <span class="section-caret">&#9660;</span>
+    <span class="section-title">API Usage</span>
+    <span id="stats-subtitle" class="count"></span>
+  </div>
+  <div class="section-body hidden" id="body-stats">
+    <div id="stats-wrap"><p class="empty">Loading...</p></div>
+  </div>
+</section>
+
+<!-- ================================================================
      Section 1: Missing Models
      ================================================================ -->
-<section>
-  <h2>Missing Models <span id="missing-count" class="count"></span></h2>
-  <div id="missing-table-wrap">
-    <p class="empty">Loading...</p>
+<section id="sec-missing">
+  <div class="section-header" onclick="toggleSection('missing')">
+    <span class="section-caret">&#9660;</span>
+    <span class="section-title">Missing Models</span>
+    <span id="missing-count" class="count"></span>
+  </div>
+  <div class="section-body" id="body-missing">
+    <div id="missing-table-wrap"><p class="empty">Loading...</p></div>
   </div>
 </section>
 
 <!-- ================================================================
      Section 2: Photo Library
      ================================================================ -->
-<section>
-  <h2>Photo Library <span id="library-count" class="count"></span></h2>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-    <input type="text" id="library-search" placeholder="Filter by model name..."
-      oninput="renderLibrary()"
-      style="background:#111;border:1px solid #444;color:#fff;padding:6px 10px;font-family:monospace;font-size:13px;width:280px;">
-    <label style="color:#888;font-size:12px;display:flex;align-items:center;gap:6px;">
-      <input type="checkbox" id="library-show-all" onchange="renderLibrary()"> Show empty (no photo)
-    </label>
+<section id="sec-library">
+  <div class="section-header" onclick="toggleSection('library')">
+    <span class="section-caret">&#9660;</span>
+    <span class="section-title">Photo Library</span>
+    <span id="library-count" class="count"></span>
   </div>
-  <div id="library-wrap">
-    <p class="empty">Loading...</p>
-  </div>
-</section>
-
-<!-- ================================================================
-     Section 4: Auto-fetch runner
-     ================================================================ -->
-<section>
-  <h2>Auto-Fetch (Wikipedia / DuckDuckGo)</h2>
-  <div class="fetch-controls">
-    <button id="fetch-btn" onclick="runFetch()">Run Auto-Fetch</button>
-    <span id="fetch-spinner" style="display:none" class="spinner">&#9654;</span>
-    <span id="fetch-msg" class="msg"></span>
-  </div>
-  <pre id="fetch-output">Output will appear here.</pre>
-</section>
-
-<!-- ================================================================
-     Section 5: Manual upload (any model)
-     ================================================================ -->
-<section>
-  <h2>Manual Upload</h2>
-  <p style="color:#777;font-size:12px;margin-bottom:12px;">Upload an image for any model — overwrites existing entry.</p>
-  <div class="manual-form">
-    <label>
-      Model name
-      <input type="text" id="manual-model" placeholder="e.g. Cessna 172S" autocomplete="off">
-    </label>
-    <label>
-      Image file
-      <input type="file" id="manual-file" accept="image/*" onchange="onManualFileChange()">
-    </label>
-    <div id="manual-paste-zone" class="paste-zone" onclick="document.getElementById('manual-file').click()" title="Click to browse or paste (Ctrl+V) / drag an image here">
-      <span id="manual-paste-label">Ctrl+V to paste<br>or click to browse</span>
+  <div class="section-body" id="body-library">
+    <div class="lib-controls">
+      <input type="text" id="library-search" placeholder="Filter by model name..." oninput="libraryPage=0;renderLibrary()">
+      <label><input type="checkbox" id="library-show-empty" onchange="libraryPage=0;renderLibrary()"> Show empty (no photo)</label>
     </div>
-    <button onclick="manualUpload()">Upload</button>
+    <div id="library-wrap"><p class="empty">Loading...</p></div>
+    <div class="pagination" id="library-pagination"></div>
   </div>
-  <div id="manual-msg"></div>
+</section>
+
+<!-- ================================================================
+     Section 3: Auto-Fetch
+     ================================================================ -->
+<section id="sec-fetch">
+  <div class="section-header collapsed" onclick="toggleSection('fetch')">
+    <span class="section-caret">&#9660;</span>
+    <span class="section-title">Auto-Fetch (Wikipedia / DuckDuckGo)</span>
+  </div>
+  <div class="section-body hidden" id="body-fetch">
+    <div class="fetch-controls">
+      <button id="fetch-btn" onclick="runFetch()">Run Auto-Fetch</button>
+      <span id="fetch-spinner" style="display:none" class="spinner">&#9654;</span>
+      <span id="fetch-msg" class="msg"></span>
+    </div>
+    <pre id="fetch-output">Output will appear here.</pre>
+  </div>
+</section>
+
+<!-- ================================================================
+     Section 4: Manual Upload
+     ================================================================ -->
+<section id="sec-upload">
+  <div class="section-header collapsed" onclick="toggleSection('upload')">
+    <span class="section-caret">&#9660;</span>
+    <span class="section-title">Manual Upload</span>
+  </div>
+  <div class="section-body hidden" id="body-upload">
+    <p style="color:#777;font-size:12px;margin-bottom:12px;">Upload an image for any model — overwrites existing entry.</p>
+    <div class="manual-form">
+      <label>
+        Model name
+        <input type="text" id="manual-model" placeholder="e.g. Cessna 172S" autocomplete="off">
+      </label>
+      <label>
+        Image file
+        <input type="file" id="manual-file" accept="image/*" onchange="onManualFileChange()">
+      </label>
+      <div id="manual-paste-zone" class="paste-zone" onclick="document.getElementById('manual-file').click()" title="Click to browse or paste (Ctrl+V)">
+        <span id="manual-paste-label">Ctrl+V to paste<br>or click to browse</span>
+      </div>
+      <button onclick="manualUpload()">Upload</button>
+    </div>
+    <div id="manual-msg"></div>
+  </div>
 </section>
 
 <script>
@@ -184,11 +207,49 @@ function escHtml(s) {
 }
 
 // ----------------------------------------------------------------
+// Collapsible sections
+// ----------------------------------------------------------------
+const STORAGE_KEY = 'admin_sections';
+
+function loadSectionStates() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+
+function saveSectionState(id, collapsed) {
+  const states = loadSectionStates();
+  states[id] = collapsed;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(states));
+}
+
+function toggleSection(id) {
+  const header = document.querySelector(`#sec-${id} .section-header`);
+  const body   = document.getElementById(`body-${id}`);
+  const collapsed = !header.classList.contains('collapsed');
+  header.classList.toggle('collapsed', collapsed);
+  body.classList.toggle('hidden', collapsed);
+  saveSectionState(id, collapsed);
+}
+
+function restoreSectionStates() {
+  const states = loadSectionStates();
+  // Default collapsed state for sections not yet in storage
+  const defaults = { stats: true, missing: false, library: false, fetch: true, upload: true };
+  const merged = Object.assign({}, defaults, states);
+  for (const [id, collapsed] of Object.entries(merged)) {
+    const header = document.querySelector(`#sec-${id} .section-header`);
+    const body   = document.getElementById(`body-${id}`);
+    if (!header || !body) continue;
+    header.classList.toggle('collapsed', collapsed);
+    body.classList.toggle('hidden', collapsed);
+  }
+}
+
+// ----------------------------------------------------------------
 // Clipboard / paste state
 // ----------------------------------------------------------------
-let manualPastedFile = null;   // file waiting in the manual paste zone
-let activeRowIndex   = null;   // index of the currently-open row upload panel
-const rowPastedFiles = {};     // rowIndex -> File
+let manualPastedFile = null;
+let activeRowIndex   = null;
+const rowPastedFiles = {};
 
 function extractImageFromClipboard(e) {
   const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items || [];
@@ -202,12 +263,8 @@ document.addEventListener('paste', (e) => {
   const file = extractImageFromClipboard(e);
   if (!file) return;
   e.preventDefault();
-
-  if (activeRowIndex !== null) {
-    setRowPaste(activeRowIndex, file);
-  } else {
-    setManualPaste(file);
-  }
+  if (activeRowIndex !== null) setRowPaste(activeRowIndex, file);
+  else setManualPaste(file);
 });
 
 function setManualPaste(file) {
@@ -215,26 +272,19 @@ function setManualPaste(file) {
   const zone  = document.getElementById('manual-paste-zone');
   const label = document.getElementById('manual-paste-label');
   zone.classList.add('has-image');
-  // show preview inside the paste zone
   const url = URL.createObjectURL(file);
   label.innerHTML = `<img src="${url}" style="max-height:80px;max-width:160px;object-fit:contain"><br><span style="font-size:11px;color:#aaa">${escHtml(file.name || 'pasted image')}</span>`;
 }
 
 function onManualFileChange() {
   const fileInput = document.getElementById('manual-file');
-  if (fileInput.files.length) {
-    manualPastedFile = null;
-    setManualPaste(fileInput.files[0]);
-  }
+  if (fileInput.files.length) { manualPastedFile = null; setManualPaste(fileInput.files[0]); }
 }
 
 function setRowPaste(i, file) {
   rowPastedFiles[i] = file;
   const preview = document.getElementById(`row-preview-${i}`);
-  if (preview) {
-    preview.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
-  }
+  if (preview) { preview.src = URL.createObjectURL(file); preview.style.display = 'block'; }
 }
 
 function onRowFileChange(i) {
@@ -243,7 +293,7 @@ function onRowFileChange(i) {
 }
 
 // ----------------------------------------------------------------
-// Section 1: load missing models table
+// Section 1: Missing Models
 // ----------------------------------------------------------------
 async function loadMissing() {
   const wrap    = document.getElementById('missing-table-wrap');
@@ -261,9 +311,7 @@ async function loadMissing() {
         <td>${escHtml(r.key)}</td>
         <td>${r.last_updated ? new Date(r.last_updated * 1000).toLocaleString() : '—'}</td>
         <td id="thumb-${i}">—</td>
-        <td>
-          <button onclick="toggleUpload(${i}, '${escHtml(r.key).replace(/'/g,"\\'")}')">Upload</button>
-        </td>
+        <td><button onclick="toggleUpload(${i}, '${escHtml(r.key).replace(/'/g,"\\'")}')">Upload</button></td>
       </tr>
       <tr class="upload-row" id="upload-row-${i}" style="display:none">
         <td colspan="4" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:none">
@@ -273,8 +321,7 @@ async function loadMissing() {
           <button onclick="rowUpload(${i}, '${escHtml(r.key).replace(/'/g,"\\'")}')">Submit</button>
           <span id="upload-msg-${i}" class="msg"></span>
         </td>
-      </tr>
-    `).join('');
+      </tr>`).join('');
     wrap.innerHTML = `
       <table>
         <thead><tr><th>Model</th><th>Last Checked</th><th>Preview</th><th>Actions</th></tr></thead>
@@ -293,7 +340,7 @@ function toggleUpload(i, model) {
 }
 
 async function rowUpload(i, model) {
-  const file  = rowPastedFiles[i] || (document.getElementById(`upload-file-${i}`)?.files[0]);
+  const file  = rowPastedFiles[i] || document.getElementById(`upload-file-${i}`)?.files[0];
   const msgEl = document.getElementById(`upload-msg-${i}`);
   if (!file) { setMsg(msgEl, 'No file selected — pick a file or paste (Ctrl+V).', 'err'); return; }
   setMsg(msgEl, 'Uploading...', '');
@@ -312,6 +359,7 @@ async function rowUpload(i, model) {
       document.getElementById(`upload-row-${i}`).style.display = 'none';
       delete rowPastedFiles[i];
       activeRowIndex = null;
+      await loadLibrary();
     } else {
       setMsg(msgEl, data.error || 'Upload failed.', 'err');
     }
@@ -321,124 +369,66 @@ async function rowUpload(i, model) {
 }
 
 // ----------------------------------------------------------------
-// Section 2: auto-fetch runner
-// ----------------------------------------------------------------
-async function runFetch() {
-  const btn     = document.getElementById('fetch-btn');
-  const spinner = document.getElementById('fetch-spinner');
-  const msgEl   = document.getElementById('fetch-msg');
-  const pre     = document.getElementById('fetch-output');
-
-  btn.disabled = true;
-  spinner.style.display = 'inline-block';
-  setMsg(msgEl, 'Running...', '');
-  pre.textContent = '';
-
-  try {
-    const res  = await fetch('/admin/run-fetch', { method: 'POST' });
-    const data = await res.json();
-    const out  = [data.stdout, data.stderr].filter(Boolean).join('\n--- stderr ---\n');
-    pre.textContent = out || '(no output)';
-    setMsg(msgEl, data.returncode === 0 ? 'Done.' : `Exit code ${data.returncode}`, data.returncode === 0 ? 'ok' : 'err');
-    await loadMissing();
-  } catch(e) {
-    pre.textContent = e.message;
-    setMsg(msgEl, 'Request failed.', 'err');
-  } finally {
-    btn.disabled = false;
-    spinner.style.display = 'none';
-  }
-}
-
-// ----------------------------------------------------------------
-// Section 3: manual upload
-// ----------------------------------------------------------------
-async function manualUpload() {
-  const modelInput = document.getElementById('manual-model');
-  const fileInput  = document.getElementById('manual-file');
-  const msgEl      = document.getElementById('manual-msg');
-  msgEl.textContent = '';
-  msgEl.className = 'msg';
-
-  const model = modelInput.value.trim();
-  if (!model) { setMsg(msgEl, 'Model name is required.', 'err'); return; }
-
-  const file = manualPastedFile || fileInput.files[0];
-  if (!file) { setMsg(msgEl, 'No image — pick a file, paste (Ctrl+V), or drag one in.', 'err'); return; }
-
-  setMsg(msgEl, 'Uploading...', '');
-  const fd = new FormData();
-  fd.append('model', model);
-  fd.append('file', file, file.name || 'paste.jpg');
-  try {
-    const res  = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.ok) {
-      setMsg(msgEl, `Saved to ${data.local_path}`, 'ok');
-      modelInput.value = '';
-      fileInput.value  = '';
-      manualPastedFile = null;
-      document.getElementById('manual-paste-zone').classList.remove('has-image');
-      document.getElementById('manual-paste-label').innerHTML = 'Ctrl+V to paste<br>or click to browse';
-      await loadMissing();
-    } else {
-      setMsg(msgEl, data.error || 'Upload failed.', 'err');
-    }
-  } catch(e) {
-    setMsg(msgEl, e.message, 'err');
-  }
-}
-
-// ----------------------------------------------------------------
-// Section 2: Photo Library
+// Section 2: Photo Library (with pagination)
 // ----------------------------------------------------------------
 let libraryData = [];
+let libraryPage = 0;
+const PAGE_SIZES = [25, 50, 100];
 
 async function loadLibrary() {
-  const wrap    = document.getElementById('library-wrap');
-  const countEl = document.getElementById('library-count');
   try {
-    const res  = await fetch('/api/photos');
+    const res = await fetch('/api/photos');
     libraryData = await res.json();
     renderLibrary();
   } catch(e) {
-    wrap.innerHTML = `<p class="empty">Failed to load: ${e.message}</p>`;
+    document.getElementById('library-wrap').innerHTML =
+      `<p class="empty">Failed to load: ${e.message}</p>`;
   }
 }
 
 function renderLibrary() {
   const wrap      = document.getElementById('library-wrap');
   const countEl   = document.getElementById('library-count');
+  const pagEl     = document.getElementById('library-pagination');
   const query     = document.getElementById('library-search').value.toLowerCase();
-  const showEmpty = document.getElementById('library-show-all').checked;
+  const showEmpty = document.getElementById('library-show-empty').checked;
+  const pageSel   = document.getElementById('lib-page-size');
+  const pageSize  = pageSel ? (pageSel.value === 'all' ? Infinity : parseInt(pageSel.value)) : 25;
 
-  let rows = libraryData.filter(r => {
+  const filtered = libraryData.filter(r => {
     if (!showEmpty && !r.local_path) return false;
     if (query && !r.key.toLowerCase().includes(query)) return false;
     return true;
   });
 
-  countEl.textContent = `(${rows.length} shown / ${libraryData.length} total)`;
+  const totalPages = pageSize === Infinity ? 1 : Math.ceil(filtered.length / pageSize);
+  if (libraryPage >= totalPages) libraryPage = Math.max(0, totalPages - 1);
 
-  if (!rows.length) {
+  const pageRows = pageSize === Infinity
+    ? filtered
+    : filtered.slice(libraryPage * pageSize, (libraryPage + 1) * pageSize);
+
+  const withPhoto = filtered.filter(r => r.local_path).length;
+  countEl.textContent = `(${withPhoto} with photo, ${filtered.length - withPhoto} empty)`;
+
+  if (!filtered.length) {
     wrap.innerHTML = '<p class="empty">No entries match.</p>';
+    pagEl.innerHTML = '';
     return;
   }
 
-  const tbody = rows.map(r => {
+  const tbody = pageRows.map(r => {
     const thumb  = r.local_path
       ? `<img class="thumb" src="${escHtml(r.local_path)}?t=${Date.now()}" alt="" onerror="this.style.opacity=0.2">`
       : '<span style="color:#555">—</span>';
-    const src    = r.source || '—';
-    const ts     = r.last_updated ? new Date(r.last_updated * 1000).toLocaleString() : '—';
     const delBtn = r.local_path
       ? `<button onclick="deletePhoto(${escHtml(JSON.stringify(r.key))}, this)" style="color:#f88;border-color:rgba(255,100,100,0.3)">Delete</button>`
       : '<span style="color:#444">no file</span>';
     return `<tr>
       <td>${escHtml(r.key)}</td>
       <td>${thumb}</td>
-      <td>${escHtml(src)}</td>
-      <td>${ts}</td>
+      <td>${escHtml(r.source || '—')}</td>
+      <td>${r.last_updated ? new Date(r.last_updated * 1000).toLocaleString() : '—'}</td>
       <td>${delBtn}</td>
     </tr>`;
   }).join('');
@@ -448,6 +438,33 @@ function renderLibrary() {
       <thead><tr><th>Model</th><th>Preview</th><th>Source</th><th>Last Updated</th><th>Actions</th></tr></thead>
       <tbody>${tbody}</tbody>
     </table>`;
+
+  // Pagination controls
+  if (pageSize === Infinity || totalPages <= 1) {
+    pagEl.innerHTML = `
+      <span>${filtered.length} entries</span>
+      <label>Per page
+        <select id="lib-page-size" onchange="libraryPage=0;renderLibrary()">
+          ${PAGE_SIZES.map(n => `<option value="${n}"${pageSize===n?' selected':''}>  ${n}</option>`).join('')}
+          <option value="all"${pageSize===Infinity?' selected':''}>All</option>
+        </select>
+      </label>`;
+  } else {
+    const start = libraryPage * pageSize + 1;
+    const end   = Math.min((libraryPage + 1) * pageSize, filtered.length);
+    pagEl.innerHTML = `
+      <button onclick="libraryPage=0;renderLibrary()" ${libraryPage===0?'disabled':''}>&#171; First</button>
+      <button onclick="libraryPage--;renderLibrary()" ${libraryPage===0?'disabled':''}>&#8249; Prev</button>
+      <span>${start}–${end} of ${filtered.length}</span>
+      <button onclick="libraryPage++;renderLibrary()" ${libraryPage>=totalPages-1?'disabled':''}>Next &#8250;</button>
+      <button onclick="libraryPage=${totalPages-1};renderLibrary()" ${libraryPage>=totalPages-1?'disabled':''}>Last &#187;</button>
+      <label>Per page
+        <select id="lib-page-size" onchange="libraryPage=0;renderLibrary()">
+          ${PAGE_SIZES.map(n => `<option value="${n}"${pageSize===n?' selected':''}>  ${n}</option>`).join('')}
+          <option value="all">All</option>
+        </select>
+      </label>`;
+  }
 }
 
 async function deletePhoto(key, btn) {
@@ -456,17 +473,14 @@ async function deletePhoto(key, btn) {
   btn.textContent = '...';
   try {
     const res  = await fetch('/admin/photos/delete', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ key }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
     });
     const data = await res.json();
     if (data.ok) {
-      // Update local data and re-render without a full reload
       const entry = libraryData.find(r => r.key === key);
       if (entry) { entry.local_path = ''; entry.source = 'none'; entry.source_url = ''; }
       renderLibrary();
-      // Refresh missing table since this entry is now missing again
       await loadMissing();
     } else {
       btn.disabled = false;
@@ -481,8 +495,121 @@ async function deletePhoto(key, btn) {
 }
 
 // ----------------------------------------------------------------
+// Section 3: Auto-Fetch
+// ----------------------------------------------------------------
+async function runFetch() {
+  const btn     = document.getElementById('fetch-btn');
+  const spinner = document.getElementById('fetch-spinner');
+  const msgEl   = document.getElementById('fetch-msg');
+  const pre     = document.getElementById('fetch-output');
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  setMsg(msgEl, 'Running...', '');
+  pre.textContent = '';
+  try {
+    const res  = await fetch('/admin/run-fetch', { method: 'POST' });
+    const data = await res.json();
+    pre.textContent = [data.stdout, data.stderr].filter(Boolean).join('\n--- stderr ---\n') || '(no output)';
+    setMsg(msgEl, data.returncode === 0 ? 'Done.' : `Exit code ${data.returncode}`,
+                  data.returncode === 0 ? 'ok' : 'err');
+    await Promise.all([loadMissing(), loadLibrary()]);
+  } catch(e) {
+    pre.textContent = e.message;
+    setMsg(msgEl, 'Request failed.', 'err');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+// ----------------------------------------------------------------
+// Section 4: Manual Upload
+// ----------------------------------------------------------------
+async function manualUpload() {
+  const modelInput = document.getElementById('manual-model');
+  const fileInput  = document.getElementById('manual-file');
+  const msgEl      = document.getElementById('manual-msg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg';
+  const model = modelInput.value.trim();
+  if (!model) { setMsg(msgEl, 'Model name is required.', 'err'); return; }
+  const file = manualPastedFile || fileInput.files[0];
+  if (!file) { setMsg(msgEl, 'No image — pick a file or paste (Ctrl+V).', 'err'); return; }
+  setMsg(msgEl, 'Uploading...', '');
+  const fd = new FormData();
+  fd.append('model', model);
+  fd.append('file', file, file.name || 'paste.jpg');
+  try {
+    const res  = await fetch('/admin/photos/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      setMsg(msgEl, `Saved to ${data.local_path}`, 'ok');
+      modelInput.value = '';
+      fileInput.value  = '';
+      manualPastedFile = null;
+      document.getElementById('manual-paste-zone').classList.remove('has-image');
+      document.getElementById('manual-paste-label').innerHTML = 'Ctrl+V to paste<br>or click to browse';
+      await Promise.all([loadMissing(), loadLibrary()]);
+    } else {
+      setMsg(msgEl, data.error || 'Upload failed.', 'err');
+    }
+  } catch(e) {
+    setMsg(msgEl, e.message, 'err');
+  }
+}
+
+// ----------------------------------------------------------------
+// Section 0: API Usage stats
+// ----------------------------------------------------------------
+async function loadStats() {
+  const wrap     = document.getElementById('stats-wrap');
+  const subtitle = document.getElementById('stats-subtitle');
+  try {
+    const res  = await fetch('/api/stats');
+    const data = await res.json();
+
+    const monthStart = new Date(data.month_start_ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const s = data.settings;
+
+    // Build source rows merging this_month + all_time
+    const sources = new Set([...Object.keys(data.this_month), ...Object.keys(data.all_time)]);
+    const adbMonthCount = data.this_month['aerodatabox'] || 0;
+    subtitle.textContent = `(${adbMonthCount} AeroDataBox calls this month)`;
+
+    const sourceRows = [...sources].sort().map(src => {
+      const month = data.this_month[src] || 0;
+      const all   = data.all_time[src]   || 0;
+      const highlight = src === 'aerodatabox' ? ' style="color:#fa8"' : '';
+      return `<tr${highlight}><td>${escHtml(src || '—')}</td><td>${month}</td><td>${all}</td></tr>`;
+    }).join('');
+
+    const enabledColor = s.aerodatabox_enabled ? '#6f6' : '#f66';
+    const enabledText  = s.aerodatabox_enabled ? 'enabled' : 'DISABLED';
+
+    wrap.innerHTML = `
+      <table style="width:auto;min-width:340px;margin-bottom:16px">
+        <thead><tr><th>Source</th><th>This month (since ${escHtml(monthStart)})</th><th>All time</th></tr></thead>
+        <tbody>${sourceRows}</tbody>
+      </table>
+      <div style="font-size:12px;color:#888;display:flex;gap:24px;flex-wrap:wrap">
+        <span>AeroDataBox: <span style="color:${enabledColor}">${enabledText}</span></span>
+        <span>Poll interval: <span style="color:#ccc">${s.flight_poll_interval}s</span></span>
+        <span>Route cache TTL: <span style="color:#ccc">${s.route_cache_ttl_hours}h</span></span>
+      </div>
+      <p style="color:#555;font-size:11px;margin-top:10px">
+        To change settings, edit config/config.json and restart the app.<br>
+        Set <code style="color:#aaa">AERODATABOX_ENABLED: false</code> to pause all AeroDataBox calls instantly.
+      </p>`;
+  } catch(e) {
+    wrap.innerHTML = `<p class="empty">Failed to load: ${e.message}</p>`;
+  }
+}
+
+// ----------------------------------------------------------------
 // Init
 // ----------------------------------------------------------------
+restoreSectionStates();
+loadStats();
 loadMissing();
 loadLibrary();
 </script>

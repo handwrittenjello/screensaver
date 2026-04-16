@@ -16,28 +16,28 @@ headers {
 }
 
 vars:pre-request {
-  testReg: G-EUOE
+  testReg: N4859F
 }
 
 tests {
   test("Status is 200 (image found) or 204 (no image)", function() {
     expect([200, 204]).to.include(res.getStatus());
   });
-
+  
   test("If 200 — response has a url field", function() {
     if (res.getStatus() !== 200) return;
     const data = res.getBody();
     expect(data).to.have.property("url");
     expect(data.url).to.be.a("string").and.match(/^https?:\/\//);
   });
-
+  
   test("If 200 — response has author and license fields", function() {
     if (res.getStatus() !== 200) return;
     const data = res.getBody();
     expect(data).to.have.property("author");
     expect(data).to.have.property("license");
   });
-
+  
   test("Log image result", function() {
     const reg = bru.getVar("testReg");
     if (res.getStatus() === 204) {
